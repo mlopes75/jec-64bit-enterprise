@@ -1,0 +1,13 @@
+name: jec_enterprise_64bit
+description: >-
+  Extensão de alta performance para o ecossistema JEC (Julia Epoch Compact).
+  Realiza empacotamento de bits (bit packing) em 64-bits com microssegundos e 7 bits livres.
+version: 1.0.0
+repository: https://github.com/mlopes75/jec-64bit-enterprise
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^3.0.0
