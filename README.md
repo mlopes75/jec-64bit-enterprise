@@ -64,6 +64,10 @@ dart pub get
 dart test
 ```
 
-📦 Repositórios do Ecossistemajec-sistema-julia-epoch-compact — Algoritmo base focado em representação visual e strings.jec-64bit-enterprise — Este repositório focado em arquitetura binária e Web3.
+📦 Repositórios do Ecossistema jec-sistema-julia-epoch-compact 
+- Algoritmo base focado em representação visual e strings.jec-64bit-enterprise
+- Este repositório focado em arquitetura binária e Web3.
 
-📄 LicençaEste projeto está licenciado sob a Licença MIT (Variante Ética) — consulte o arquivo LICENSE para detalhes.
+📄 Licença
+Este projeto está licenciado sob a Licença MIT (Variante Ética)
+- consulte o arquivo LICENSE para detalhes.
