@@ -15,7 +15,7 @@ Este repositório é um ambiente unificado (monorepo) contendo as implementaçõ
 [ User Space ][ Século JEC ][  Ano Puro   ][ Mês   ][  Dia   ][ Hora   ][ Minut ][ Segun ][   Microssegundos   ]
    (6 bits)      (5 bits)      (7 bits)    (4 bits)  (5 bits)  (5 bits)  (6 bits)  (6 bits)       (20 bits)
 ```
-- User Space (6 bits): Espaço livre do utilizador para injetar o ID do microsserviço ou servidor (0 a 127) sem custo extra de armazenamento.
+- User Space (6 bits): Espaço livre do utilizador para injetar o ID do microsserviço ou servidor (0 a 63) sem custo extra de armazenamento.
 - Século (5 bits): Mapeado pelas 25 letras do alfabeto JEC (banindo a letra "O" para evitar ambiguidade visual).
 - Ano (7 bits): Guarda o valor puro do ano corrente (0 a 99).
 - Microssegundos (20 bits): Garante alta precisão (0 a 999.999) com zero erros de arredondamento.
