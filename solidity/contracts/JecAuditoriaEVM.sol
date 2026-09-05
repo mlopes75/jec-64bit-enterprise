@@ -4,9 +4,10 @@ pragma solidity ^0.8.20;
 import "./JecEnterprise64BitPacker.sol";
 
 /**
- * @title JecAuditoriaEVM
- * @notice Contrato de auditoria on-chain imutável baseado em block.timestamp e JEC 64-Bit.
- * @dev Utiliza o JEC Enterprise 64-Bit para compactar timestamp + metadados em 64 bits.
+ * @notice Converte um timestamp UNIX em componentes JEC.
+ * @dev Ciclo de 2500 anos: (ano/100) % 25 → índice 0-24 → letra A-Z (sem 'O')
+ *      Este é o ciclo 0 (anos 0-2499), que é o único relevante para block.timestamp
+ *      por muitos milênios. A biblioteca pack() usa ciclo 0 por padrão.
  */
 contract JecAuditoriaEVM {
     using JecEnterprise64BitPacker for uint64;
