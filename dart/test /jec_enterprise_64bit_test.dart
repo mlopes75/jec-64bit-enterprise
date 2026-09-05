@@ -2,10 +2,10 @@ import 'package:jec_enterprise_64bit/jec_enterprise_64bit.dart';
 import 'package:test/test.dart';
 
 void main() {
-  group('Testes de Consistência JEC Enterprise 64-Bit', () {
-    test('Deve empacotar e desempacotar mantendo a string intacta', () {
+  group('Validação de Tamanho do Barramento (64 Bits Exactos)', () {
+    test('Deve empacotar e desempacotar corretamente com Header de 6 bits', () {
       final int packed = JecEnterprise64BitPacker.pack(
-        headerBits: 42,
+        headerBits: 42, // Valor válido (0 a 63)
         seculo: "V",
         ano: 26,
         mes: 9,
@@ -22,9 +22,10 @@ void main() {
       expect(humanString, equals("LOG.V26ICW225015.123456"));
     });
 
-    test('Deve aplicar máscara binária no User Space para evitar overflow', () {
+    test('HeaderBits de 6 bits deve aplicar máscara 0x3F', () {
+      // 64 excede 6 bits (0 a 63), a máscara 0x3F transforma em 0
       final int packed = JecEnterprise64BitPacker.pack(
-        headerBits: 128,
+        headerBits: 64,
         seculo: "V",
         ano: 26,
         mes: 1,
