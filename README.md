@@ -1,6 +1,6 @@
 # 💎 JEC Enterprise 64-Bit — Sistema (Julia Epoch Compact)
 
-O **Ecossistema JEC Enterprise** é uma extensão de infraestrutura de alta performance baseada no algoritmo determinístico do **Sistema Julia** original. Esta especificação foi concebida para realizar **Bit Packing** na camada de aplicação, encapsulando alta precisão temporal (**microssegundos**) e **7 bits de metadados livres** dentro de uma única palavra nativa de **64 bits (8 Bytes)**.
+O **Ecossistema JEC Enterprise** é uma extensão de infraestrutura de alta performance baseada no algoritmo determinístico do **Sistema Julia** original. Esta especificação foi concebida para realizar **Bit Packing** na camada de aplicação, encapsulando alta precisão temporal (**microssegundos**) e **6 bits de metadados livres** dentro de uma única palavra nativa de **64 bits (8 Bytes)**.
 
 Este repositório é um ambiente unificado (monorepo) contendo as implementações oficiais para **Dart (Backend/Fluxos de Dados)** e **Solidity (Web3/EVM)**, garantindo persistência e transmissão cross-platform 100% simétrica.
 
@@ -13,9 +13,9 @@ Este repositório é um ambiente unificado (monorepo) contendo as implementaçõ
 ```text
 0             7             12            19        23        28        33        39        45                  64
 [ User Space ][ Século JEC ][  Ano Puro   ][ Mês   ][  Dia   ][ Hora   ][ Minut ][ Segun ][   Microssegundos   ]
-   (7 bits)      (5 bits)      (7 bits)    (4 bits)  (5 bits)  (5 bits)  (6 bits)  (6 bits)       (20 bits)
+   (6 bits)      (5 bits)      (7 bits)    (4 bits)  (5 bits)  (5 bits)  (6 bits)  (6 bits)       (20 bits)
 ```
-- User Space (7 bits): Espaço livre do utilizador para injetar o ID do microsserviço ou servidor (0 a 127) sem custo extra de armazenamento.
+- User Space (6 bits): Espaço livre do utilizador para injetar o ID do microsserviço ou servidor (0 a 127) sem custo extra de armazenamento.
 - Século (5 bits): Mapeado pelas 25 letras do alfabeto JEC (banindo a letra "O" para evitar ambiguidade visual).
 - Ano (7 bits): Guarda o valor puro do ano corrente (0 a 99).
 - Microssegundos (20 bits): Garante alta precisão (0 a 999.999) com zero erros de arredondamento.
@@ -55,7 +55,7 @@ void main() {
 | :--- | :---: | :---: | :---: |
 | **ISO-8601 String** | 24 Bytes | -200% (Desperdício) | Nenhum |
 | **Unix Epoch + Microssegundos** | 16 Bytes (Struct) | -100% (Desperdício) | Nenhum |
-| **JEC Enterprise** | **8 Bytes (uint64)** | **+75% de Economia** | **7 bits livres inclusos** |
+| **JEC Enterprise** | **8 Bytes (uint64)** | **+75% de Economia** | **6 bits livres inclusos** |
 
 🧪 Testes de Stress e Integridade
 Para rodar os testes automatizados da camada Dart:
