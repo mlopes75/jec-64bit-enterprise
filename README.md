@@ -31,10 +31,8 @@ Este repositório é um ambiente unificado (monorepo) contendo as implementaçõ
 
 Exemplo de Uso: - Dart
 ```
-import 'package:jec_enterprise_64bit/jec_enterprise_64bit.dart';
-
 void main() {
-  int payload64Bits = JecEnterprise64BitPacker.pack(
+  final int packed = JecEnterprise64Bit.pack(
     headerBits: 42,
     seculo: "V",
     ano: 26,
@@ -46,10 +44,8 @@ void main() {
     microssegundos: 123456,
   );
 
-  print('ID Binário Compactado: $payload64Bits');
-  
-  String visualString = JecEnterprise64BitPacker.unpackToHumanString(payload64Bits, alias: "LOG");
-  print('String Visual: $visualString'); // LOG.V26ICW225015.123456
+  print(JecEnterprise64Bit.unpackToHumanString(packed, alias: "LOG"));
+  // Saída: LOG.V26ICW5015.123456 ✅
 }
 ```
 🎯 2. Camada Solidity (Ethereum / EVM)
