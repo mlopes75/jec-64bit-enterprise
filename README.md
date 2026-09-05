@@ -11,9 +11,9 @@ Este repositório é um ambiente unificado (monorepo) contendo as implementaçõ
 ## 📐 Estrutura do Barramento de Bits
 
 ```text
-0             7             12            19        23        28        33        39        45                  64
-[ User Space ][ Século JEC ][  Ano Puro   ][ Mês   ][  Dia   ][ Hora   ][ Minut ][ Segun ][   Microssegundos   ]
-   (6 bits)      (5 bits)      (7 bits)    (4 bits)  (5 bits)  (5 bits)  (6 bits)  (6 bits)       (20 bits)
+63        58 57       53 52      46 45   42 41   37 36   32 31   26 25   20 19                 0
+[ Header   ][ Século   ][ Ano     ][ Mês  ][ Dia  ][ Hora ][ Min  ][ Seg  ][ Microssegundos     ]
+ (6 bits)    (5 bits)   (7 bits)   (4b)    (5b)    (5b)    (6b)    (6b)       (20 bits)
 ```
 - User Space (6 bits): Espaço livre do utilizador para injetar o ID do microsserviço ou servidor (0 a 63) sem custo extra de armazenamento.
 - Século (5 bits): Mapeado pelas 25 letras do alfabeto JEC (banindo a letra "O" para evitar ambiguidade visual).
