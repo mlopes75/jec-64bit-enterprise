@@ -4,6 +4,8 @@ O **Ecossistema JEC Enterprise** é uma extensão de infraestrutura de alta perf
 
 Este repositório é um ambiente unificado (monorepo) contendo as implementações oficiais para **Dart (Backend/Fluxos de Dados)** e **Solidity (Web3/EVM)**, garantindo persistência e transmissão cross-platform 100% simétrica.
 
+"O JEC assume um ciclo de 2500 anos; para diferenciar ciclos, use os bits de User Space ou mantenha contexto externo de época."
+
 *Dedicado em homenagem à minha filha Julia pelo tempo que nos foi tirado.*
 
 ---
