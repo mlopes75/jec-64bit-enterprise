@@ -11,22 +11,14 @@ import "./JecEnterprise64BitPacker.sol";
 contract JecAuditoriaEVM {
     using JecEnterprise64BitPacker for uint64;
 
-    // Evento otimizado: indexa o Header e grava o Payload JEC de 64 bits
     event CheckpointRegistado(
         uint64 indexed headerBits, 
         uint64 indexed jecTimestamp, 
         address indexed operador
     );
 
-    // Mapeamento de estado: JEC Timestamp (uint64) => Status (1 = Ativo)
     mapping(uint64 => uint8) public checkpoints;
 
-    /**
-     * @notice Registra um checkpoint de auditoria amarrado estritamente ao block.timestamp da EVM.
-     * @param codigoServidor ID do nó/servidor (0 a 63 -> 6 bits).
-     * @param microssegundos Offset do relógio local (0 a 999.999 -> 20 bits).
-     * @return jecTimestamp O timestamp JEC empacotado em 64 bits.
-     */
     function registarCheckpoint(
         uint64 codigoServidor,
         uint64 microssegundos
@@ -34,10 +26,9 @@ contract JecAuditoriaEVM {
         require(codigoServidor <= 63, "JEC: Servidor ID excede 6 bits");
         require(microssegundos <= 999999, "JEC: Microssegundos excedem 20 bits");
 
-        // 1. Extração matemática determinística (Sem loops, O(1) Gas)
-        (uint64 seculoIdx, uint64 ano, uint64 mes, uint64 dia, uint64 hora, uint64 minuto, uint64 segundo) = _converterTimestamp(block.timestamp);
+        (uint64 seculoIdx, uint64 ano, uint64 mes, uint64 dia, uint64 hora, uint64 minuto, uint64 segundo) = 
+            _converterTimestamp(block.timestamp);
 
-        // 2. Empacotamento em barramento de 64 bits
         jecTimestamp = JecEnterprise64BitPacker.pack(
             codigoServidor,
             seculoIdx,
@@ -50,20 +41,16 @@ contract JecAuditoriaEVM {
             microssegundos
         );
 
-        // 3. Prevenção de colisão de chaves
         require(checkpoints[jecTimestamp] == 0, "JEC: Checkpoint ja existe neste microsegundo");
-
-        // 4. Armazenamento ultra-compacto
         checkpoints[jecTimestamp] = 1;
-
-        // 5. Emissão do evento
         emit CheckpointRegistado(codigoServidor, jecTimestamp, msg.sender);
 
         return jecTimestamp;
     }
 
     /**
-     * @notice Converte um timestamp UNIX em componentes JEC de forma pura e sem loops.
+     * @notice Converte um timestamp UNIX em componentes JEC.
+     * @dev Ciclo de 2500 anos: (ano/100) % 25 → índice 0-24 → letra A-Z (sem 'O')
      */
     function _converterTimestamp(uint256 timestamp) 
         internal 
@@ -81,19 +68,13 @@ contract JecAuditoriaEVM {
         uint256 yearFull;
         (yearFull, mes, dia) = _daysToDate(timestamp / 86400);
 
-        // Ano no formato de 2 dígitos (0-99)
         ano = uint64(yearFull % 100);
+        
+        // 🎯 CICLO DE 2500 ANOS: (século) % 25
+        uint256 seculo = yearFull / 100;
+        uint256 seculoCiclico = seculo % 25;
+        seculoIdx = uint64(seculoCiclico);
 
-        // Mapeamento do Século 21 (Anos 2000-2099): 'V' representa o índice 20 na alphaTable (sem a letra 'O')
-        if (yearFull >= 2000 && yearFull <= 2099) {
-            seculoIdx = 20; // 'V'
-        } else if (yearFull >= 2100 && yearFull <= 2199) {
-            seculoIdx = 21; // 'W'
-        } else {
-            seculoIdx = 0;  // Fallback para 'A'
-        }
-
-        // Horário
         uint256 secondsInDay = timestamp % 86400;
         hora = uint64(secondsInDay / 3600);
         minuto = uint64((secondsInDay % 3600) / 60);
@@ -101,7 +82,7 @@ contract JecAuditoriaEVM {
     }
 
     /**
-     * @dev Algoritmo constante O(1) de conversão de Dias Epoch para Data (Ano, Mês, Dia).
+     * @dev Algoritmo O(1) de conversão de Dias Epoch para Data (Fliegel-Van Flandern)
      */
     function _daysToDate(uint256 _days) internal pure returns (uint256 year, uint64 month, uint64 day) {
         int256 __days = int256(_days);
@@ -120,6 +101,26 @@ contract JecAuditoriaEVM {
         year = uint256(_year);
         month = uint64(uint256(_month));
         day = uint64(uint256(_day));
+    }
+
+    /**
+     * @notice Wrapper público para testes e consultas off-chain.
+     * @dev Expõe a conversão interna sem alterar a visibilidade de produção.
+     */
+    function converterTimestampPublico(uint256 timestamp) 
+        external 
+        pure 
+        returns (
+            uint64 seculoIdx,
+            uint64 ano,
+            uint64 mes,
+            uint64 dia,
+            uint64 hora,
+            uint64 minuto,
+            uint64 segundo
+        ) 
+    {
+        return _converterTimestamp(timestamp);
     }
 
     function obterCheckpoint(uint64 jecTimestamp) external view returns (uint8) {
