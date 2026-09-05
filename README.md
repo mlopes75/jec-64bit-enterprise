@@ -71,7 +71,10 @@ Para rodar os testes automatizados da camada Dart:
 dart pub get
 dart test
 ```
-
+e
+```
+dart test test/jec_enterprise_integrity_test.dart
+```
 📦 Repositórios do Ecossistema jec-sistema-julia-epoch-compact 
 - Algoritmo base focado em representação visual e strings.jec-64bit-enterprise
 - Este repositório focado em arquitetura binária e Web3.
