@@ -242,50 +242,42 @@ void main() {
     // ============================================================
     // 5. TESTES DE SIMETRIA COMPLETO (Round-Trip)
     // ============================================================
-    group('Testes de Simetria (Round-Trip)', () {
-      test('Deve manter a integridade após empacotar e desempacotar múltiplos cenários', () {
-        final testCases = [
-          {'header': 0, 'seculo': 'A', 'ano': 0, 'mes': 1, 'dia': 1, 'hora': 0, 'minuto': 0, 'segundo': 0, 'mcs': 0},
-          {'header': 63, 'seculo': 'Z', 'ano': 99, 'mes': 12, 'dia': 31, 'hora': 23, 'minuto': 59, 'segundo': 59, 'mcs': 999999},
-          {'header': 42, 'seculo': 'V', 'ano': 26, 'mes': 9, 'dia': 3, 'hora': 22, 'minuto': 50, 'segundo': 15, 'mcs': 123456},
-          {'header': 7, 'seculo': 'M', 'ano': 5, 'mes': 6, 'dia': 15, 'hora': 8, 'minuto': 30, 'segundo': 45, 'mcs': 98765},
-        ];
+group('Testes de Simetria (Round-Trip)', () {
+  test('Deve manter a integridade exata após empacotar e desempacotar múltiplos cenários', () {
+    final testCases = [
+      {'header': 0, 'seculo': 'A', 'ano': 0, 'mes': 1, 'dia': 1, 'hora': 0, 'minuto': 0, 'segundo': 0, 'mcs': 0},
+      {'header': 63, 'seculo': 'Z', 'ano': 99, 'mes': 12, 'dia': 31, 'hora': 23, 'minuto': 59, 'segundo': 59, 'mcs': 999999},
+      {'header': 42, 'seculo': 'V', 'ano': 26, 'mes': 9, 'dia': 3, 'hora': 22, 'minuto': 50, 'segundo': 15, 'mcs': 123456},
+      {'header': 7, 'seculo': 'M', 'ano': 5, 'mes': 6, 'dia': 15, 'hora': 8, 'minuto': 30, 'segundo': 45, 'mcs': 98765},
+    ];
 
-        for (var tc in testCases) {
-          final int packed = JecEnterprise64Bit.pack(
-            headerBits: tc['header'] as int,
-            seculo: tc['seculo'] as String,
-            ano: tc['ano'] as int,
-            mes: tc['mes'] as int,
-            dia: tc['dia'] as int,
-            hora: tc['hora'] as int,
-            minuto: tc['minuto'] as int,
-            segundo: tc['segundo'] as int,
-            microssegundos: tc['mcs'] as int,
-          );
+    for (var tc in testCases) {
+      final int packed = JecEnterprise64Bit.pack(
+        headerBits: tc['header'] as int,
+        seculo: tc['seculo'] as String,
+        ano: tc['ano'] as int,
+        mes: tc['mes'] as int,
+        dia: tc['dia'] as int,
+        hora: tc['hora'] as int,
+        minuto: tc['minuto'] as int,
+        segundo: tc['segundo'] as int,
+        microssegundos: tc['mcs'] as int,
+      );
 
-          final int headerExtraido = JecEnterprise64Bit.extractHeaderBits(packed);
-          final int idxSeculo = (packed >> 53) & 0x1F;
-          final int anoExtraido = (packed >> 46) & 0x7F;
-          final int mesExtraido = (packed >> 42) & 0x0F;
-          final int diaExtraido = (packed >> 37) & 0x1F;
-          final int horaExtraida = (packed >> 32) & 0x1F;
-          final int minExtraido = (packed >> 26) & 0x3F;
-          final int segExtraido = (packed >> 20) & 0x3F;
-          final int mcsExtraido = packed & 0xFFFFF;
+      final Map<String, dynamic> data = JecEnterprise64Bit.unpack(packed);
 
-          expect(headerExtraido, equals(tc['header']));
-          expect(JecEnterprise64Bit.alphaTable[idxSeculo], equals(tc['seculo']));
-          expect(anoExtraido, equals(tc['ano']));
-          expect(mesExtraido, equals(tc['mes']));
-          expect(diaExtraido, equals(tc['dia']));
-          expect(horaExtraida, equals(tc['hora']));
-          expect(minExtraido, equals(tc['minuto']));
-          expect(segExtraido, equals(tc['segundo']));
-          expect(mcsExtraido, equals(tc['mcs']));
-        }
-      });
-    });
+      expect(data['headerBits'], equals(tc['header']));
+      expect(data['seculo'], equals(tc['seculo']));
+      expect(data['ano'], equals(tc['ano']));
+      expect(data['mes'], equals(tc['mes']));
+      expect(data['dia'], equals(tc['dia']));
+      expect(data['hora'], equals(tc['hora']));
+      expect(data['minuto'], equals(tc['minuto']));
+      expect(data['segundo'], equals(tc['segundo']));
+      expect(data['microssegundos'], equals(tc['mcs']));
+    }
+  });
+});
 
     // ============================================================
     // 6. TESTE DE PERFORMANCE (Benchmark Ajustado)
@@ -361,12 +353,6 @@ void main() {
           segundo: segundo,
           microssegundos: mcs,
         );
-
-        expect(packed1, equals(packed2));
-      });
-    });
-  });
-}
 
         expect(packed1, equals(packed2));
       });
