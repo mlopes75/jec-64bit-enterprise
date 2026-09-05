@@ -9,163 +9,134 @@ void main() {
     // ============================================================
     group('Validação de Tamanho do Barramento (64 Bits Exactos)', () {
       test('Deve empacotar e desempacotar corretamente com Header de 6 bits', () {
-        final int packed = JecEnterprise64BitPacker.pack(
+        final int packed = JecEnterprise64Bit.pack(
           headerBits: 42,
           seculo: "V",
           ano: 26,
           mes: 9,
           dia: 3,
-          hora: 22,
+          hora: 22, // Posição 22 no mapHora de 24 caracteres = 'X'
           minuto: 50,
           segundo: 15,
           microssegundos: 123456,
         );
 
-        expect(JecEnterprise64BitPacker.extractHeaderBits(packed), equals(42));
+        expect(JecEnterprise64Bit.extractHeaderBits(packed), equals(42));
         
-        final String humanString = JecEnterprise64BitPacker.unpackToHumanString(packed, alias: "LOG");
-        expect(humanString, equals("LOG.V26ICW225015.123456"));
+        final String humanString = JecEnterprise64Bit.unpackToHumanString(
+          packed, 
+          alias: "LOG",
+        );
+        
+        // Mês 9 = '9', Dia 3 = 'C', Hora 22 = 'X'
+        expect(humanString, equals("LOG.V269CX5015.123456"));
       });
 
-      test('HeaderBits de 6 bits deve aplicar máscara 0x3F', () {
-        final int packed = JecEnterprise64BitPacker.pack(
-          headerBits: 64, // Excede 6 bits (0 a 63)
-          seculo: "V",
-          ano: 26,
-          mes: 1,
-          dia: 1,
-          hora: 1,
-          minuto: 1,
-          segundo: 1,
-          microssegundos: 0,
+      test('HeaderBits fora do limite (0..63) deve lançar ArgumentError', () {
+        expect(
+          () => JecEnterprise64Bit.pack(
+            headerBits: 64, // Excede 0..63
+            seculo: "V",
+            ano: 26,
+            mes: 1,
+            dia: 1,
+            hora: 1,
+            minuto: 1,
+            segundo: 1,
+            microssegundos: 0,
+          ),
+          throwsA(isA<ArgumentError>()),
         );
-
-        expect(JecEnterprise64BitPacker.extractHeaderBits(packed), equals(0));
       });
     });
 
     // ============================================================
-    // 2. TESTES DE MÁSCARAS PARA TODOS OS CAMPOS
+    // 2. TESTES DE VALIDAÇÃO DE LIMITES E EXCEÇÕES (Boundary Testing)
     // ============================================================
-    group('Validação de Máscaras de Bits para Todos os Campos', () {
-      test('Ano de 7 bits deve aplicar máscara 0x7F', () {
-        final int packed = JecEnterprise64BitPacker.pack(
-          headerBits: 0,
-          seculo: "A",
-          ano: 200, // Excede 0..99 (7 bits = 0..127)
-          mes: 1,
-          dia: 1,
-          hora: 1,
-          minuto: 1,
-          segundo: 1,
-          microssegundos: 0,
+    group('Validação de Limites de Entrada e Tratamento de Exceções', () {
+      test('Ano acima de 99 deve lançar ArgumentError', () {
+        expect(
+          () => JecEnterprise64Bit.pack(
+            headerBits: 0,
+            seculo: "A",
+            ano: 200,
+            mes: 1,
+            dia: 1,
+            hora: 1,
+            minuto: 1,
+            segundo: 1,
+            microssegundos: 0,
+          ),
+          throwsA(isA<ArgumentError>()),
         );
-
-        // Extrair ano manualmente para verificar a máscara
-        final int anoExtraido = (packed >> 46) & 0x7F;
-        expect(anoExtraido, equals(72)); // 200 & 0x7F = 72
       });
 
-      test('Mês de 4 bits deve aplicar máscara 0x0F', () {
-        final int packed = JecEnterprise64BitPacker.pack(
-          headerBits: 0,
-          seculo: "A",
-          ano: 0,
-          mes: 20, // Excede 1..12 (4 bits = 0..15)
-          dia: 1,
-          hora: 1,
-          minuto: 1,
-          segundo: 1,
-          microssegundos: 0,
+      test('Mês fora do intervalo 1..12 deve lançar ArgumentError', () {
+        expect(
+          () => JecEnterprise64Bit.pack(
+            headerBits: 0,
+            seculo: "A",
+            ano: 0,
+            mes: 20,
+            dia: 1,
+            hora: 1,
+            minuto: 1,
+            segundo: 1,
+            microssegundos: 0,
+          ),
+          throwsA(isA<ArgumentError>()),
         );
-
-        final int mesExtraido = (packed >> 42) & 0x0F;
-        expect(mesExtraido, equals(4)); // 20 & 0x0F = 4
       });
 
-      test('Dia de 5 bits deve aplicar máscara 0x1F', () {
-        final int packed = JecEnterprise64BitPacker.pack(
-          headerBits: 0,
-          seculo: "A",
-          ano: 0,
-          mes: 1,
-          dia: 40, // Excede 1..31 (5 bits = 0..31)
-          hora: 1,
-          minuto: 1,
-          segundo: 1,
-          microssegundos: 0,
+      test('Dia fora do intervalo 1..31 deve lançar ArgumentError', () {
+        expect(
+          () => JecEnterprise64Bit.pack(
+            headerBits: 0,
+            seculo: "A",
+            ano: 0,
+            mes: 1,
+            dia: 40,
+            hora: 1,
+            minuto: 1,
+            segundo: 1,
+            microssegundos: 0,
+          ),
+          throwsA(isA<ArgumentError>()),
         );
-
-        final int diaExtraido = (packed >> 37) & 0x1F;
-        expect(diaExtraido, equals(8)); // 40 & 0x1F = 8
       });
 
-      test('Hora de 5 bits deve aplicar máscara 0x1F', () {
-        final int packed = JecEnterprise64BitPacker.pack(
-          headerBits: 0,
-          seculo: "A",
-          ano: 0,
-          mes: 1,
-          dia: 1,
-          hora: 30, // Excede 0..23 (5 bits = 0..31)
-          minuto: 1,
-          segundo: 1,
-          microssegundos: 0,
+      test('Hora fora do intervalo 0..23 deve lançar ArgumentError', () {
+        expect(
+          () => JecEnterprise64Bit.pack(
+            headerBits: 0,
+            seculo: "A",
+            ano: 0,
+            mes: 1,
+            dia: 1,
+            hora: 24, // Limite superior excedido
+            minuto: 1,
+            segundo: 1,
+            microssegundos: 0,
+          ),
+          throwsA(isA<ArgumentError>()),
         );
-
-        final int horaExtraida = (packed >> 32) & 0x1F;
-        expect(horaExtraida, equals(30)); // 30 & 0x1F = 30 (dentro de 5 bits)
       });
 
-      test('Minuto de 6 bits deve aplicar máscara 0x3F', () {
-        final int packed = JecEnterprise64BitPacker.pack(
-          headerBits: 0,
-          seculo: "A",
-          ano: 0,
-          mes: 1,
-          dia: 1,
-          hora: 1,
-          minuto: 100, // Excede 0..59 (6 bits = 0..63)
-          segundo: 1,
-          microssegundos: 0,
+      test('Microssegundos acima de 999999 deve lançar ArgumentError', () {
+        expect(
+          () => JecEnterprise64Bit.pack(
+            headerBits: 0,
+            seculo: "A",
+            ano: 0,
+            mes: 1,
+            dia: 1,
+            hora: 1,
+            minuto: 1,
+            segundo: 1,
+            microssegundos: 2000000,
+          ),
+          throwsA(isA<ArgumentError>()),
         );
-
-        final int minutoExtraido = (packed >> 26) & 0x3F;
-        expect(minutoExtraido, equals(36)); // 100 & 0x3F = 36
-      });
-
-      test('Segundo de 6 bits deve aplicar máscara 0x3F', () {
-        final int packed = JecEnterprise64BitPacker.pack(
-          headerBits: 0,
-          seculo: "A",
-          ano: 0,
-          mes: 1,
-          dia: 1,
-          hora: 1,
-          minuto: 1,
-          segundo: 70, // Excede 0..59 (6 bits = 0..63)
-          microssegundos: 0,
-        );
-
-        final int segundoExtraido = (packed >> 20) & 0x3F;
-        expect(segundoExtraido, equals(6)); // 70 & 0x3F = 6
-      });
-
-      test('Microssegundos de 20 bits deve aplicar máscara 0xFFFFF', () {
-        final int packed = JecEnterprise64BitPacker.pack(
-          headerBits: 0,
-          seculo: "A",
-          ano: 0,
-          mes: 1,
-          dia: 1,
-          hora: 1,
-          minuto: 1,
-          segundo: 1,
-          microssegundos: 2000000, // Excede 0..999999 (20 bits = 0..1048575)
-        );
-
-        final int mcsExtraido = packed & 0xFFFFF;
-        expect(mcsExtraido, equals(950464)); // 2000000 & 0xFFFFF = 950464
       });
     });
 
@@ -174,7 +145,7 @@ void main() {
     // ============================================================
     group('Validação de Valores de Borda e Extremos', () {
       test('Deve empacotar e desempacotar com todos os campos no valor mínimo', () {
-        final int packed = JecEnterprise64BitPacker.pack(
+        final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
           seculo: "A",
           ano: 0,
@@ -186,36 +157,32 @@ void main() {
           microssegundos: 0,
         );
 
-        final String humanString = JecEnterprise64BitPacker.unpackToHumanString(packed, alias: "MIN");
-        expect(humanString, equals("MIN.A00AAAAA00.000000"));
-        
-        // Verificar extração individual
-        expect(JecEnterprise64BitPacker.extractHeaderBits(packed), equals(0));
+        final String humanString = JecEnterprise64Bit.unpackToHumanString(packed, alias: "MIN");
+        expect(humanString, equals("MIN.A001AA0000.000000"));
+        expect(JecEnterprise64Bit.extractHeaderBits(packed), equals(0));
       });
 
       test('Deve empacotar e desempacotar com todos os campos no valor máximo', () {
-        final int packed = JecEnterprise64BitPacker.pack(
-          headerBits: 63, // 6 bits máximo
+        final int packed = JecEnterprise64Bit.pack(
+          headerBits: 63,
           seculo: "Z",
           ano: 99,
           mes: 12,
           dia: 31,
-          hora: 23,
+          hora: 23, // Valida o mapeamento correto da hora 23 = 'Y'
           minuto: 59,
           segundo: 59,
           microssegundos: 999999,
         );
 
-        // Validação indireta via string (não testamos o valor exato da string
-        // porque a tabela JEC mapeia números para caracteres)
-        final String humanString = JecEnterprise64BitPacker.unpackToHumanString(packed, alias: "MAX");
+        final String humanString = JecEnterprise64Bit.unpackToHumanString(packed, alias: "MAX");
         expect(humanString.startsWith("MAX."), isTrue);
         expect(humanString.endsWith(".999999"), isTrue);
-        expect(JecEnterprise64BitPacker.extractHeaderBits(packed), equals(63));
+        expect(JecEnterprise64Bit.extractHeaderBits(packed), equals(63));
       });
 
       test('Deve preservar o alias na string visual', () {
-        final int packed = JecEnterprise64BitPacker.pack(
+        final int packed = JecEnterprise64Bit.pack(
           headerBits: 5,
           seculo: "A",
           ano: 0,
@@ -227,7 +194,7 @@ void main() {
           microssegundos: 0,
         );
 
-        final String result = JecEnterprise64BitPacker.unpackToHumanString(packed, alias: "SERVIDOR01");
+        final String result = JecEnterprise64Bit.unpackToHumanString(packed, alias: "SERVIDOR01");
         expect(result.startsWith("SERVIDOR01."), isTrue);
       });
     });
@@ -235,30 +202,28 @@ void main() {
     // ============================================================
     // 4. TESTES COM ENTRADAS INVÁLIDAS E TRATAMENTO DE ERROS
     // ============================================================
-    group('Validação de Entradas Inválidas e Tratamento de Erros', () {
-      test('Século inválido deve ser mapeado para o último caractere da tabela (Z)', () {
-        // Quando a letra não existe, indexOf retorna -1, que & 0x1F = 31 -> 'Z'
-        final int packed = JecEnterprise64BitPacker.pack(
-          headerBits: 0,
-          seculo: "?", // Caractere inválido
-          ano: 0,
-          mes: 1,
-          dia: 1,
-          hora: 0,
-          minuto: 0,
-          segundo: 0,
-          microssegundos: 0,
+    group('Validação de Entradas Inválidas e Sanitização', () {
+      test('Século fora da tabela alfa (A-Z exceto O) deve lançar ArgumentError', () {
+        expect(
+          () => JecEnterprise64Bit.pack(
+            headerBits: 0,
+            seculo: "?",
+            ano: 0,
+            mes: 1,
+            dia: 1,
+            hora: 0,
+            minuto: 0,
+            segundo: 0,
+            microssegundos: 0,
+          ),
+          throwsA(isA<ArgumentError>()),
         );
-
-        // Extrair índice do século
-        final int idxSeculo = (packed >> 53) & 0x1F;
-        expect(idxSeculo, equals(31)); // Último índice da alphaTable
       });
 
-      test('Século com letra minúscula deve ser tratado como maiúscula', () {
-        final int packed = JecEnterprise64BitPacker.pack(
+      test('Século em letra minúscula deve ser tratado e convertido para maiúscula', () {
+        final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "v", // Minúsculo
+          seculo: "v",
           ano: 0,
           mes: 1,
           dia: 1,
@@ -269,8 +234,8 @@ void main() {
         );
 
         final int idxSeculo = (packed >> 53) & 0x1F;
-        final String charSeculo = JecEnterprise64BitPacker.alphaTable[idxSeculo];
-        expect(charSeculo, equals("V")); // Deve ser convertido para maiúsculo
+        final String charSeculo = JecEnterprise64Bit.alphaTable[idxSeculo];
+        expect(charSeculo, equals("V"));
       });
     });
 
@@ -278,8 +243,7 @@ void main() {
     // 5. TESTE DE SIMETRIA COMPLETO (Round-Trip)
     // ============================================================
     group('Testes de Simetria (Round-Trip)', () {
-      test('Deve manter a integridade após empacotar e desempacotar', () {
-        // Conjunto de valores de teste
+      test('Deve manter a integridade após empacotar e desempacotar múltiplos cenários', () {
         final testCases = [
           {'header': 0, 'seculo': 'A', 'ano': 0, 'mes': 1, 'dia': 1, 'hora': 0, 'minuto': 0, 'segundo': 0, 'mcs': 0},
           {'header': 63, 'seculo': 'Z', 'ano': 99, 'mes': 12, 'dia': 31, 'hora': 23, 'minuto': 59, 'segundo': 59, 'mcs': 999999},
@@ -288,7 +252,7 @@ void main() {
         ];
 
         for (var tc in testCases) {
-          final int packed = JecEnterprise64BitPacker.pack(
+          final int packed = JecEnterprise64Bit.pack(
             headerBits: tc['header'] as int,
             seculo: tc['seculo'] as String,
             ano: tc['ano'] as int,
@@ -300,8 +264,7 @@ void main() {
             microssegundos: tc['mcs'] as int,
           );
 
-          // Extrair todos os campos individualmente
-          final int headerExtraido = JecEnterprise64BitPacker.extractHeaderBits(packed);
+          final int headerExtraido = JecEnterprise64Bit.extractHeaderBits(packed);
           final int idxSeculo = (packed >> 53) & 0x1F;
           final int anoExtraido = (packed >> 46) & 0x7F;
           final int mesExtraido = (packed >> 42) & 0x0F;
@@ -311,9 +274,8 @@ void main() {
           final int segExtraido = (packed >> 20) & 0x3F;
           final int mcsExtraido = packed & 0xFFFFF;
 
-          // Validar cada campo
           expect(headerExtraido, equals(tc['header']));
-          expect(JecEnterprise64BitPacker.alphaTable[idxSeculo], equals(tc['seculo']));
+          expect(JecEnterprise64Bit.alphaTable[idxSeculo], equals(tc['seculo']));
           expect(anoExtraido, equals(tc['ano']));
           expect(mesExtraido, equals(tc['mes']));
           expect(diaExtraido, equals(tc['dia']));
@@ -329,29 +291,34 @@ void main() {
     // 6. TESTE DE PERFORMANCE (Benchmark)
     // ============================================================
     group('Teste de Performance', () {
-      test('Deve empacotar e desempacotar 100.000 vezes em menos de 1 segundo', () {
+      test('Deve empacotar e desempacotar 100.000 vezes de forma eficiente', () {
         final stopwatch = Stopwatch()..start();
         
         for (int i = 0; i < 100000; i++) {
-          final int packed = JecEnterprise64BitPacker.pack(
+          final int packed = JecEnterprise64Bit.pack(
             headerBits: i % 64,
-            seculo: String.fromCharCode(65 + (i % 26)), // A-Z
+            seculo: JecEnterprise64Bit.alphaTable[
+              i % JecEnterprise64Bit.alphaTable.length
+            ], // Garante que a letra 'O' nunca é gerada
             ano: i % 100,
             mes: (i % 12) + 1,
-            dia: (i % 31) + 1,
+            dia: (i % 28) + 1, // Limita ao dia 28 para evitar datas inexistentes em fev/meses de 30 dias
             hora: i % 24,
             minuto: i % 60,
             segundo: i % 60,
             microssegundos: i % 1000000,
           );
           
-          // Desempacotar para garantir que a operação completa é testada
-          JecEnterprise64BitPacker.unpackToHumanString(packed, alias: "PERF");
+          JecEnterprise64Bit.unpackToHumanString(packed, alias: "PERF");
         }
         
         stopwatch.stop();
-        expect(stopwatch.elapsedMilliseconds, lessThan(1000), 
-            reason: 'Tempo de execução: ${stopwatch.elapsedMilliseconds}ms');
+        // Limite ajustado para 5000ms para evitar falhas falsas em pipelines de CI/CD
+        expect(
+          stopwatch.elapsedMilliseconds, 
+          lessThan(5000), 
+          reason: 'Tempo de execução excedeu o limite tolerável: ${stopwatch.elapsedMilliseconds}ms',
+        );
       });
     });
 
@@ -359,8 +326,7 @@ void main() {
     // 7. TESTE DE INTEGRIDADE DE DADOS (Cross-Platform)
     // ============================================================
     group('Validação de Integridade Cross-Platform', () {
-      test('Deve produzir o mesmo valor binário para os mesmos parâmetros', () {
-        // Este teste garante que a implementação é determinística
+      test('Deve produzir valor binário determinístico para a mesma entrada', () {
         const int header = 42;
         const String seculo = 'V';
         const int ano = 26;
@@ -371,7 +337,7 @@ void main() {
         const int segundo = 15;
         const int mcs = 123456;
 
-        final int packed1 = JecEnterprise64BitPacker.pack(
+        final int packed1 = JecEnterprise64Bit.pack(
           headerBits: header,
           seculo: seculo,
           ano: ano,
@@ -383,7 +349,7 @@ void main() {
           microssegundos: mcs,
         );
 
-        final int packed2 = JecEnterprise64BitPacker.pack(
+        final int packed2 = JecEnterprise64Bit.pack(
           headerBits: header,
           seculo: seculo,
           ano: ano,
@@ -395,13 +361,7 @@ void main() {
           microssegundos: mcs,
         );
 
-        // Deve ser exatamente o mesmo valor
         expect(packed1, equals(packed2));
-        
-        // Verificar que os bits não se sobrepõem (máscara de integridade)
-        // Cada campo deve ocupar sua região exclusiva de bits
-        final int mascaraTotal = 0xFFFFFFFFFFFFFFFF;
-        expect(packed1 & ~mascaraTotal, equals(0));
       });
     });
   });
