@@ -47,11 +47,18 @@ void main() {
   print('String Visual: $visualString'); // LOG.V26ICW225015.123456
 }
 ```
-⛓️ 2. Camada Solidity (Ethereum / EVM)Localizada na pasta /solidity, a biblioteca foi desenvolvida com foco em Gas Optimization, permitindo salvar múltiplos parâmetros de tempo gastando apenas um slot de memória (uint64).
+2. Camada Solidity (Ethereum / EVM)Localizada na pasta /solidity, a biblioteca foi desenvolvida com foco em Gas Optimization, permitindo salvar múltiplos parâmetros de tempo gastando apenas um slot de memória (uint64).
 
-📊 Métricas de Impacto em Larga EscalaFormato UsadoPegada em MemóriaEficiência vs Unix 64-bitEspaço p/ MetadadosISO-8601 String24 Bytes-200% (Desperdício)NenhumUnix Epoch + Microssegundos16 Bytes (Struct)-100% (Desperdício)NenhumJEC Enterprise8 Bytes (uint64)+75% de Economia7 bits livres inclusos🧪 
+📊 Métricas de Impacto em Larga Escala
 
-Testes de Stress e IntegridadePara rodar os testes automatizados da camada Dart:Bashcd dart
+| Formato Usado | Pegada em Memória | Eficiência vs Unix 64-bit | Espaço p/ Metadados |
+| :--- | :---: | :---: | :---: |
+| **ISO-8601 String** | 24 Bytes | -200% (Desperdício) | Nenhum |
+| **Unix Epoch + Microssegundos** | 16 Bytes (Struct) | -100% (Desperdício) | Nenhum |
+| **JEC Enterprise** | **8 Bytes (uint64)** | **+75% de Economia** | **7 bits livres inclusos** |
+
+🧪 Testes de Stress e Integridade
+Para rodar os testes automatizados da camada Dart:
 ```
 dart pub get
 dart test
