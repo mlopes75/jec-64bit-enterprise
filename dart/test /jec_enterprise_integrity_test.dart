@@ -240,7 +240,7 @@ void main() {
     });
 
     // ============================================================
-    // 5. TESTE DE SIMETRIA COMPLETO (Round-Trip)
+    // 5. TESTES DE SIMETRIA COMPLETO (Round-Trip)
     // ============================================================
     group('Testes de Simetria (Round-Trip)', () {
       test('Deve manter a integridade após empacotar e desempacotar múltiplos cenários', () {
@@ -288,7 +288,7 @@ void main() {
     });
 
     // ============================================================
-    // 6. TESTE DE PERFORMANCE (Benchmark)
+    // 6. TESTE DE PERFORMANCE (Benchmark Ajustado)
     // ============================================================
     group('Teste de Performance', () {
       test('Deve empacotar e desempacotar 100.000 vezes de forma eficiente', () {
@@ -299,10 +299,10 @@ void main() {
             headerBits: i % 64,
             seculo: JecEnterprise64Bit.alphaTable[
               i % JecEnterprise64Bit.alphaTable.length
-            ], // Garante que a letra 'O' nunca é gerada
+            ], // Garante uso apenas de letras válidas (sem 'O')
             ano: i % 100,
             mes: (i % 12) + 1,
-            dia: (i % 28) + 1, // Limita ao dia 28 para evitar datas inexistentes em fev/meses de 30 dias
+            dia: (i % 28) + 1, // Garante que a data é válida em qualquer mês
             hora: i % 24,
             minuto: i % 60,
             segundo: i % 60,
@@ -313,7 +313,8 @@ void main() {
         }
         
         stopwatch.stop();
-        // Limite ajustado para 5000ms para evitar falhas falsas em pipelines de CI/CD
+        
+        // Tolerância ajustada para 5000ms para evitar falhas falsas em pipelines de CI/CD
         expect(
           stopwatch.elapsedMilliseconds, 
           lessThan(5000), 
@@ -360,6 +361,12 @@ void main() {
           segundo: segundo,
           microssegundos: mcs,
         );
+
+        expect(packed1, equals(packed2));
+      });
+    });
+  });
+}
 
         expect(packed1, equals(packed2));
       });
