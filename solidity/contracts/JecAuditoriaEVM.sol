@@ -4,31 +4,51 @@ pragma solidity ^0.8.20;
 import "./JecEnterprise64BitPacker.sol";
 
 /**
- * @notice Converte um timestamp UNIX em componentes JEC.
- * @dev Ciclo de 2500 anos: (ano/100) % 25 → índice 0-24 → letra A-Z (sem 'O')
- *      Este é o ciclo 0 (anos 0-2499), que é o único relevante para block.timestamp
- *      por muitos milênios. A biblioteca pack() usa ciclo 0 por padrão.
+ * @title JecAuditoriaEVM
+ * @notice Contrato de auditoria on-chain imutável baseado em block.timestamp e JEC 64-Bit.
+ * @dev Otimizado para menor consumo de gas no deployment e na execução.
  */
 contract JecAuditoriaEVM {
     using JecEnterprise64BitPacker for uint64;
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CUSTOM ERRORS (Economia substancial de bytecode e gas de erro)
+    // ═══════════════════════════════════════════════════════════════════════════
+    error JecServidorExcede6Bits();
+    error JecMicrossegundosExcede20Bits();
+    error JecCheckpointJaExiste(uint64 jecTimestamp);
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EVENTOS & ESTADO
+    // ═══════════════════════════════════════════════════════════════════════════
     event CheckpointRegistado(
         uint64 indexed headerBits, 
         uint64 indexed jecTimestamp, 
         address indexed operador
     );
 
-    mapping(uint64 => uint8) public checkpoints;
+    // Mapeamento otimizado para bool (EVM usa 32 bytes por slot em mappings)
+    mapping(uint64 => bool) public checkpoints;
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FUNÇÃO PRINCIPAL
+    // ═══════════════════════════════════════════════════════════════════════════
     function registarCheckpoint(
         uint64 codigoServidor,
         uint64 microssegundos
     ) external returns (uint64 jecTimestamp) {
-        require(codigoServidor <= 63, "JEC: Servidor ID excede 6 bits");
-        require(microssegundos <= 999999, "JEC: Microssegundos excedem 20 bits");
+        if (codigoServidor > 63) revert JecServidorExcede6Bits();
+        if (microssegundos > 999_999) revert JecMicrossegundosExcede20Bits();
 
-        (uint64 seculoIdx, uint64 ano, uint64 mes, uint64 dia, uint64 hora, uint64 minuto, uint64 segundo) = 
-            _converterTimestamp(block.timestamp);
+        (
+            uint64 seculoIdx, 
+            uint64 ano, 
+            uint64 mes, 
+            uint64 dia, 
+            uint64 hora, 
+            uint64 minuto, 
+            uint64 segundo
+        ) = _converterTimestamp(block.timestamp);
 
         jecTimestamp = JecEnterprise64BitPacker.pack(
             codigoServidor,
@@ -42,17 +62,40 @@ contract JecAuditoriaEVM {
             microssegundos
         );
 
-        require(checkpoints[jecTimestamp] == 0, "JEC: Checkpoint ja existe neste microsegundo");
-        checkpoints[jecTimestamp] = 1;
+        if (checkpoints[jecTimestamp]) revert JecCheckpointJaExiste(jecTimestamp);
+        
+        checkpoints[jecTimestamp] = true;
         emit CheckpointRegistado(codigoServidor, jecTimestamp, msg.sender);
 
         return jecTimestamp;
     }
 
-    /**
-     * @notice Converte um timestamp UNIX em componentes JEC.
-     * @dev Ciclo de 2500 anos: (ano/100) % 25 → índice 0-24 → letra A-Z (sem 'O')
-     */
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONSULTAS OFF-CHAIN
+    // ═══════════════════════════════════════════════════════════════════════════
+    function checkpointExiste(uint64 jecTimestamp) external view returns (bool) {
+        return checkpoints[jecTimestamp];
+    }
+
+    function converterTimestampPublico(uint256 timestamp) 
+        external 
+        pure 
+        returns (
+            uint64 seculoIdx,
+            uint64 ano,
+            uint64 mes,
+            uint64 dia,
+            uint64 hora,
+            uint64 minuto,
+            uint64 segundo
+        ) 
+    {
+        return _converterTimestamp(timestamp);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FUNÇÕES INTERNAS OTIMIZADAS
+    // ═══════════════════════════════════════════════════════════════════════════
     function _converterTimestamp(uint256 timestamp) 
         internal 
         pure 
@@ -70,11 +113,7 @@ contract JecAuditoriaEVM {
         (yearFull, mes, dia) = _daysToDate(timestamp / 86400);
 
         ano = uint64(yearFull % 100);
-        
-        // 🎯 CICLO DE 2500 ANOS: (século) % 25
-        uint256 seculo = yearFull / 100;
-        uint256 seculoCiclico = seculo % 25;
-        seculoIdx = uint64(seculoCiclico);
+        seculoIdx = uint64((yearFull / 100) % 25);
 
         uint256 secondsInDay = timestamp % 86400;
         hora = uint64(secondsInDay / 3600);
@@ -83,52 +122,22 @@ contract JecAuditoriaEVM {
     }
 
     /**
-     * @dev Algoritmo O(1) de conversão de Dias Epoch para Data (Fliegel-Van Flandern)
+     * @dev Algoritmo Fliegel-Van Flandern otimizado em uint256 para evitar mutações de sinal int256.
      */
     function _daysToDate(uint256 _days) internal pure returns (uint256 year, uint64 month, uint64 day) {
-        int256 __days = int256(_days);
-
-        int256 L = __days + 68569 + 2440588;
-        int256 N = (4 * L) / 146097;
+        uint256 L = _days + 68569 + 2440588;
+        uint256 N = (4 * L) / 146097;
         L = L - (146097 * N + 3) / 4;
-        int256 _year = (4000 * (L + 1)) / 1461001;
+        uint256 _year = (4000 * (L + 1)) / 1461001;
         L = L - (1461 * _year) / 4 + 31;
-        int256 _month = (80 * L) / 2447;
-        int256 _day = L - (2447 * _month) / 80;
+        uint256 _month = (80 * L) / 2447;
+        uint256 _day = L - (2447 * _month) / 80;
         L = _month / 11;
         _month = _month + 2 - 12 * L;
         _year = 100 * (N - 49) + _year + L;
 
-        year = uint256(_year);
-        month = uint64(uint256(_month));
-        day = uint64(uint256(_day));
-    }
-
-    /**
-     * @notice Wrapper público para testes e consultas off-chain.
-     * @dev Expõe a conversão interna sem alterar a visibilidade de produção.
-     */
-    function converterTimestampPublico(uint256 timestamp) 
-        external 
-        pure 
-        returns (
-            uint64 seculoIdx,
-            uint64 ano,
-            uint64 mes,
-            uint64 dia,
-            uint64 hora,
-            uint64 minuto,
-            uint64 segundo
-        ) 
-    {
-        return _converterTimestamp(timestamp);
-    }
-
-    function obterCheckpoint(uint64 jecTimestamp) external view returns (uint8) {
-        return checkpoints[jecTimestamp];
-    }
-
-    function checkpointExiste(uint64 jecTimestamp) external view returns (bool) {
-        return checkpoints[jecTimestamp] == 1;
+        year = _year;
+        month = uint64(_month);
+        day = uint64(_day);
     }
 }
