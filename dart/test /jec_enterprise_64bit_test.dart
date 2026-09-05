@@ -44,4 +44,29 @@ void main() {
       );
     });
   });
+
+  test('Deve preservar corretamente o header quando o bit 63 está ativo', () {
+  final packed = JecEnterprise64Bit.pack(
+    headerBits: 63,
+    seculo: 'Z',
+    ano: 99,
+    mes: 12,
+    dia: 31,
+    hora: 23,
+    minuto: 59,
+    segundo: 59,
+    microssegundos: 999999,
+  );
+
+  expect(
+    JecEnterprise64Bit.extractHeaderBits(packed),
+    equals(63),
+  );
+
+  final data = JecEnterprise64Bit.unpack(packed);
+
+  expect(data['headerBits'], equals(63));
+  expect(data['ano'], equals(99));
+  expect(data['hora'], equals(23));
+});
 }
