@@ -1,61 +1,53 @@
-/// Classe utilitária responsável pela compressão extrema de marcas temporais
-/// utilizando máscaras binárias e operações bitwise em blocos nativos de 64 bits.
 class JecEnterprise64BitPacker {
-  // Alfabeto Puro oficial JEC para o Século (25 letras, sem o 'O')
   static const String alphaTable = "ABCDEFGHIJKLMNPQRSTUVWXYZ";
-
-  // Tabela Híbrida JEC para os restantes campos de tempo (35 Símbolos)
   static const String jecTable = "ABCDEFGHIJKLMNPQRSTUVWXYZ1234567890";
 
-  /// 1. EMPACOTAMENTO: Une os metadados e o tempo cirúrgico em exatamente 64 bits (8 Bytes).
-  /// Aloca os 7 bits mais significativos (do topo) livres para uso customizado do Data Center.
+  /// 1. EMPACOTAMENTO: Exactamente 64 BITS
   static int pack({
-    required int headerBits,       // 7 bits livres (0 a 127) para metadados/Servidor
-    required String seculo,        // 5 bits (25 letras do alfabeto JEC)
-    required int ano,             // 7 bits puros (suporta anos de 0 a 99)
-    required int mes,             // 4 bits (1 a 12)
-    required int dia,             // 5 bits (1 a 31)
-    required int hora,            // 5 bits (0 a 23)
-    required int minuto,          // 6 bits (0 a 59)
-    required int segundo,         // 6 bits (0 a 59)
-    required int microssegundos,  // 20 bits (0 a 999.999)
+    required int headerBits,       // 6 bits livres (0 a 63) -> Máscara 0x3F
+    required String seculo,        // 5 bits -> Máscara 0x1F
+    required int ano,             // 7 bits (0 a 99) -> Máscara 0x7F
+    required int mes,             // 4 bits (1 a 12) -> Máscara 0x0F
+    required int dia,             // 5 bits (1 a 31) -> Máscara 0x1F
+    required int hora,            // 5 bits (0 a 23) -> Máscara 0x1F
+    required int minuto,          // 6 bits (0 a 59) -> Máscara 0x3F
+    required int segundo,         // 6 bits (0 a 59) -> Máscara 0x3F
+    required int microssegundos,  // 20 bits (0 a 999.999) -> Máscara 0xFFFFF
   }) {
-    // Aplicação rigorosa das máscaras binárias para proteção do barramento
-    int clHeader = headerBits & 0x7F; 
-    int idxSeculo = alphaTable.indexOf(seculo.toUpperCase()) & 0x1F; 
-    int clAn = ano & 0x7F; 
-    int clMes = mes & 0x0F; 
-    int clDia = dia & 0x1F; 
-    int clHr = hora & 0x1F; 
-    int clMin = minuto & 0x3F; 
-    int clSeg = segundo & 0x3F; 
-    int clMc = microssegundos & 0xFFFFF; 
+    int clHeader = headerBits & 0x3F; // 6 bits
+    int idxSeculo = alphaTable.indexOf(seculo.toUpperCase()) & 0x1F; // 5 bits
+    int clAn = ano & 0x7F; // 7 bits
+    int clMes = mes & 0x0F; // 4 bits
+    int clDia = dia & 0x1F; // 5 bits
+    int clHr = hora & 0x1F; // 5 bits
+    int clMin = minuto & 0x3F; // 6 bits
+    int clSeg = segundo & 0x3F; // 6 bits
+    int clMc = microssegundos & 0xFFFFF; // 20 bits
 
-    // Montagem binária por deslocamento (Bitwise Shift)
-    // Soma exata: 7 + 5 + 7 + 4 + 5 + 5 + 6 + 6 + 20 = 64 BITS
-    return (clHeader << 57) |
-           (idxSeculo << 52) |
-           (clAn << 45) |
-           (clMes << 41) |
-           (clDia << 36) |
-           (clHr << 31) |
-           (clMin << 25) |
-           (clSeg << 19) |
+    // Shifts corrigidos para barramento de 64 bits:
+    // (58, 53, 46, 42, 37, 32, 26, 20, 0)
+    return (clHeader << 58) |
+           (idxSeculo << 53) |
+           (clAn << 46) |
+           (clMes << 42) |
+           (clDia << 37) |
+           (clHr << 32) |
+           (clMin << 26) |
+           (clSeg << 20) |
            clMc;
   }
 
-  /// 2. RECONSTRUÇÃO: Desempacota os 64 bits e reconstrói a String JEC com os pontos
+  /// 2. RECONSTRUÇÃO: Deslocamentos ajustados
   static String unpackToHumanString(int packedValue, {String alias = "A"}) {
-    int idxSeculo = (packedValue >> 52) & 0x1F;
-    int ano = (packedValue >> 45) & 0x7F;
-    int mes = (packedValue >> 41) & 0x0F;
-    int dia = (packedValue >> 36) & 0x1F;
-    int hora = (packedValue >> 31) & 0x1F;
-    int minuto = (packedValue >> 25) & 0x3F;
-    int segundo = (packedValue >> 19) & 0x3F;
+    int idxSeculo = (packedValue >> 53) & 0x1F;
+    int ano = (packedValue >> 46) & 0x7F;
+    int mes = (packedValue >> 42) & 0x0F;
+    int dia = (packedValue >> 37) & 0x1F;
+    int hora = (packedValue >> 32) & 0x1F;
+    int minuto = (packedValue >> 26) & 0x3F;
+    int segundo = (packedValue >> 20) & 0x3F;
     int mcs = packedValue & 0xFFFFF;
 
-    // Recuperação dos caracteres visuais a partir das tabelas JEC
     String charSeculo = alphaTable[idxSeculo];
     String strAno = ano.toString().padLeft(2, '0');
     
@@ -66,12 +58,11 @@ class JecEnterprise64BitPacker {
     String strSeg = jecTable[segundo];
     String strMcs = mcs.toString().padLeft(6, '0');
 
-    // Injeta os pontos separadores para exibição humana
     return "${alias.toUpperCase()}.$charSeculo$strAno$strMes$strDia$strHora$strMin$strSeg.$strMcs";
   }
 
-  /// 3. EXTRAÇÃO DE CABEÇALHO: Puxa os 7 bits de metadados do topo em 1 ciclo de clock
+  /// 3. EXTRAÇÃO DO HEADER: Puxa os 6 bits superiores
   static int extractHeaderBits(int packedValue) {
-    return (packedValue >> 57) & 0x7F;
+    return (packedValue >> 58) & 0x3F;
   }
 }
