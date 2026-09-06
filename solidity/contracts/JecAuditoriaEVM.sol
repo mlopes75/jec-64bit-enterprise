@@ -8,6 +8,21 @@ import "./JecEnterprise64BitPacker.sol";
  * @author mlopes75
  * @notice Contrato de auditoria on-chain imutável - VERSÃO ULTRA OTIMIZADA
  * @dev Otimizado para mínimo consumo de gas
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *  ESPECIFICAÇÕES JEC ENTERPRISE 64-BIT
+ *  ═══════════════════════════════════════════════════════════════════════════════
+ *  
+ *  Header (7 bits): 0-127 (ID do servidor/nó)
+ *  Século (4 bits): Z=0 (2000), A=1 (2100), ... P=14 (3400)
+ *  Ano (7 bits): 0-99
+ *  Mês (4 bits): 1-12
+ *  Dia (5 bits): 1-31
+ *  Hora (5 bits): 0-23 (Z=00, A=01, ... Y=23)
+ *  Minuto (6 bits): 0-59
+ *  Segundo (6 bits): 0-59
+ *  Microssegundos (20 bits): 0-999.999
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
 contract JecAuditoriaEVM {
     using JecEnterprise64BitPacker for uint64;
@@ -57,7 +72,7 @@ contract JecAuditoriaEVM {
 
         // Extração do timestamp
         (
-            uint64 seculoIdx, 
+            string memory seculo,
             uint64 ano, 
             uint64 mes, 
             uint64 dia, 
@@ -66,10 +81,10 @@ contract JecAuditoriaEVM {
             uint64 segundo
         ) = _converterTimestamp(block.timestamp);
 
-        // Empacotamento
+        // Empacotamento usando string (Z, A, B, ... P)
         jecTimestamp = JecEnterprise64BitPacker.pack(
             codigoServidor,
-            seculoIdx,
+            seculo,      // string: "Z", "A", "B", ... "P"
             ano,
             mes,
             dia,
@@ -112,7 +127,7 @@ contract JecAuditoriaEVM {
         external 
         pure 
         returns (
-            uint64 seculoIdx,
+            string memory seculo,
             uint64 ano,
             uint64 mes,
             uint64 dia,
@@ -130,13 +145,21 @@ contract JecAuditoriaEVM {
 
     /**
      * @dev Converte timestamp Unix para componentes JEC.
-     * O ciclo de 1500 anos começa em 2000.
+     * O ciclo de 1500 anos começa em 2000 com Z=0.
+     * @param timestamp Unix timestamp em segundos
+     * @return seculo String do século (Z, A, B, ... P)
+     * @return ano Ano (0-99)
+     * @return mes Mês (1-12)
+     * @return dia Dia (1-31)
+     * @return hora Hora (0-23)
+     * @return minuto Minuto (0-59)
+     * @return segundo Segundo (0-59)
      */
     function _converterTimestamp(uint256 timestamp) 
         internal 
         pure 
         returns (
-            uint64 seculoIdx,
+            string memory seculo,
             uint64 ano,
             uint64 mes,
             uint64 dia,
@@ -153,16 +176,21 @@ contract JecAuditoriaEVM {
         ano = uint64(yearFull % 100);
         
         // 🎯 Mapeamento para ciclo de 1500 anos (2000-3499)
-        // Usando assembly para operação matemática mais barata
+        // Z=0 (2000), A=1 (2100), B=2 (2200), ... P=14 (3400)
         uint256 seculo = yearFull / 100;
-        assembly {
-            // if (seculo >= 20) { seculoIdx = (seculo - 20) % 15 } else { seculoIdx = 0 }
-            let diff := sub(seculo, 20)
-            let isAfter := gt(diff, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
-            // Se diff for negativo (seculo < 20), é 0, senão diff % 15
-            let modVal := mod(diff, 15)
-            seculoIdx := mul(isAfter, modVal)
+        uint256 seculoIdx;
+        
+        if (seculo >= 20 && seculo <= 34) {
+            seculoIdx = seculo - 20;  // 2000 → 0, 2100 → 1, ... 3400 → 14
+        } else {
+            // Para anos fora do ciclo (não deveria ocorrer com block.timestamp)
+            seculoIdx = 0;
         }
+        
+        // Converte índice para caractere usando o alfabeto JEC
+        bytes24 alpha = "ZABCDEFGHJKLMNPQRSTUVWXY";
+        bytes1 char = alpha[seculoIdx];
+        seculo = string(abi.encodePacked(char));
 
         // Extrair hora, minuto, segundo
         uint256 secondsInDay = timestamp % 86400;
@@ -173,6 +201,10 @@ contract JecAuditoriaEVM {
 
     /**
      * @dev Algoritmo Fliegel-Van Flandern com uint256 puro (mais barato que int256).
+     * @param _days Número de dias desde a época Unix (1 de janeiro de 1970)
+     * @return year Ano completo
+     * @return month Mês (1-12)
+     * @return day Dia (1-31)
      */
     function _daysToDate(uint256 _days) internal pure returns (uint256 year, uint64 month, uint64 day) {
         uint256 z = _days + 719468;
@@ -199,5 +231,13 @@ contract JecAuditoriaEVM {
         returns (string memory) 
     {
         return JecEnterprise64BitPacker.unpackToHumanString(jecTimestamp, alias);
+    }
+
+    function timestampParaStringDefault(uint64 jecTimestamp) 
+        external 
+        pure 
+        returns (string memory) 
+    {
+        return JecEnterprise64BitPacker.unpackToHumanStringDefault(jecTimestamp);
     }
 }
