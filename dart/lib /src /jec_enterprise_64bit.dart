@@ -5,20 +5,20 @@ class JecEnterprise64Bit {
   // CONSTANTES
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Tabela Alfa Base: 25 letras (A-Z, sem a letra 'O').
-  static const String alphaTable = "ABCDEFGHIJKLMNPQRSTUVWXYZ";
+  /// Alfabeto Limpo JEC: 24 letras (A-Z, sem 'I' e 'O')
+  static const String alphaTable = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 
   /// Mês (1..12):
-  /// 1..9 = "1".."9", 10 = A, 11 = B, 12 = C
-  static const String mapMes = "123456789ABC";
+  /// A=Jan, B=Fev, C=Mar, D=Abr, E=Mai, F=Jun, G=Jul, H=Ago, J=Set, K=Out, L=Nov, M=Dez
+  static const String mapMes = "ABCDEFGHJKLM";
 
   /// Dia (1..31):
-  /// A..N = 1..14, P..Z = 15..25, 1..6 = 26..31
-  static const String mapDia = "ABCDEFGHIJKLMNPQRSTUVWXYZ123456";
+  /// A..Z = 1..24, 5..1 = 25..31
+  static const String mapDia = "ABCDEFGHJKLMNPQRSTUVWXYZ123456";
 
   /// Hora (0..23):
-  /// A..N = 0..13, P..X = 14..23
-  static const String mapHora = "ABCDEFGHIJKLMNPQRSTUVWX";
+  /// Z=00, A=01, B=02, ... Y=23
+  static const String mapHora = "ZABCDEFGHJKLMNPQRSTUVWXY";
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 1. EMPACOTAMENTO
@@ -36,14 +36,16 @@ class JecEnterprise64Bit {
     required int segundo,
     required int microssegundos,
   }) {
-    if (headerBits < 0 || headerBits > 63) {
+    // Validação: Header (7 bits - 0 a 127)
+    if (headerBits < 0 || headerBits > 127) {
       throw ArgumentError.value(
         headerBits,
         'headerBits',
-        'Deve estar entre 0 e 63 (6 bits).',
+        'Deve estar entre 0 e 127 (7 bits).',
       );
     }
 
+    // Validação: Século
     if (seculo.length != 1) {
       throw ArgumentError.value(
         seculo,
@@ -59,34 +61,49 @@ class JecEnterprise64Bit {
       throw ArgumentError.value(
         seculo,
         'seculo',
-        'Código inválido. Use uma letra A-Z, exceto O.',
+        'Código inválido. Use uma letra A-Z, exceto I e O.',
       );
     }
 
+    if (idxSeculo > 14) {
+      throw ArgumentError.value(
+        seculo,
+        'seculo',
+        'Século inválido. Use A-Q (0-14) para o ciclo de 1500 anos.',
+      );
+    }
+
+    // Validação: Ano
     if (ano < 0 || ano > 99) {
       throw ArgumentError.value(ano, 'ano', 'Deve estar entre 0 e 99.');
     }
 
+    // Validação: Mês
     if (mes < 1 || mes > 12) {
       throw ArgumentError.value(mes, 'mes', 'Deve estar entre 1 e 12.');
     }
 
+    // Validação: Dia
     if (dia < 1 || dia > 31) {
       throw ArgumentError.value(dia, 'dia', 'Deve estar entre 1 e 31.');
     }
 
+    // Validação: Hora
     if (hora < 0 || hora > 23) {
       throw ArgumentError.value(hora, 'hora', 'Deve estar entre 0 e 23.');
     }
 
+    // Validação: Minuto
     if (minuto < 0 || minuto > 59) {
       throw ArgumentError.value(minuto, 'minuto', 'Deve estar entre 0 e 59.');
     }
 
+    // Validação: Segundo
     if (segundo < 0 || segundo > 59) {
       throw ArgumentError.value(segundo, 'segundo', 'Deve estar entre 0 e 59.');
     }
 
+    // Validação: Microssegundos
     if (microssegundos < 0 || microssegundos > 999999) {
       throw ArgumentError.value(
         microssegundos,
@@ -107,15 +124,32 @@ class JecEnterprise64Bit {
 
     int result = 0;
 
-    // Mascaramento individual garantido por bitwise OR
-    result |= (headerBits & 0x3F) << 58;
-    result |= (idxSeculo & 0x1F) << 53;
+    // Empacotamento com os shifts corretos
+    // Header: bits 63-57 (7 bits)
+    result |= (headerBits & 0x7F) << 57;
+
+    // Século: bits 56-53 (4 bits)
+    result |= (idxSeculo & 0x0F) << 53;
+
+    // Ano: bits 52-46 (7 bits)
     result |= (ano & 0x7F) << 46;
+
+    // Mês: bits 45-42 (4 bits)
     result |= (mes & 0x0F) << 42;
+
+    // Dia: bits 41-37 (5 bits)
     result |= (dia & 0x1F) << 37;
+
+    // Hora: bits 36-32 (5 bits)
     result |= (hora & 0x1F) << 32;
+
+    // Minuto: bits 31-26 (6 bits)
     result |= (minuto & 0x3F) << 26;
+
+    // Segundo: bits 25-20 (6 bits)
     result |= (segundo & 0x3F) << 20;
+
+    // Microssegundos: bits 19-0 (20 bits)
     result |= (microssegundos & 0xFFFFF);
 
     return result;
@@ -129,7 +163,7 @@ class JecEnterprise64Bit {
     int packedValue, {
     String alias = "A",
   }) {
-    final int idxSeculo = (packedValue >> 53) & 0x1F;
+    final int idxSeculo = (packedValue >> 53) & 0x0F;
     final int ano = (packedValue >> 46) & 0x7F;
     final int mes = (packedValue >> 42) & 0x0F;
     final int dia = (packedValue >> 37) & 0x1F;
@@ -183,7 +217,7 @@ class JecEnterprise64Bit {
   // ═══════════════════════════════════════════════════════════════════════════
 
   static Map<String, dynamic> unpack(int packedValue) {
-    final int idxSeculo = (packedValue >> 53) & 0x1F;
+    final int idxSeculo = (packedValue >> 53) & 0x0F;
 
     final String seculo =
         (idxSeculo >= 0 && idxSeculo < alphaTable.length)
@@ -191,7 +225,7 @@ class JecEnterprise64Bit {
             : '?';
 
     return {
-      'headerBits': (packedValue >> 58) & 0x3F,
+      'headerBits': (packedValue >> 57) & 0x7F,
       'seculoIdx': idxSeculo,
       'seculo': seculo,
       'ano': (packedValue >> 46) & 0x7F,
@@ -208,8 +242,8 @@ class JecEnterprise64Bit {
   // 4. EXTRAÇÃO DO HEADER
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Extrai os 6 bits superiores do identificador.
+  /// Extrai os 7 bits superiores do identificador (User Space).
   static int extractHeaderBits(int packedValue) {
-    return (packedValue >> 58) & 0x3F;
+    return (packedValue >> 57) & 0x7F;
   }
 }
