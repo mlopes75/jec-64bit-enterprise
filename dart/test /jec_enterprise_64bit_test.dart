@@ -11,7 +11,7 @@ void main() {
       test('Deve empacotar e desempacotar corretamente com Header de 7 bits', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 99, // Valor válido (0 a 127)
-          seculo: "A",
+          seculo: "Z",
           ano: 26,
           mes: 9,
           dia: 30,
@@ -29,13 +29,13 @@ void main() {
         );
         
         // Mês 9 = 'J', Dia 30 = '0', Hora 23 = 'Y'
-        expect(humanString, equals("LOG.A26J0Y5314.421983"));
+        expect(humanString, equals("LOG.Z26J0Y5314.421983"));
       });
 
       test('HeaderBits no limite mínimo (0) deve funcionar', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "A",
+          seculo: "Z",
           ano: 0,
           mes: 1,
           dia: 1,
@@ -47,13 +47,13 @@ void main() {
 
         expect(JecEnterprise64Bit.extractHeaderBits(packed), equals(0));
         expect(JecEnterprise64Bit.unpackToHumanString(packed, alias: "MIN"), 
-            equals("MIN.A001AA0000.000000"));
+            equals("MIN.Z001AA0000.000000"));
       });
 
       test('HeaderBits no limite máximo (127) deve funcionar', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 127,
-          seculo: "Q",
+          seculo: "P",
           ano: 99,
           mes: 12,
           dia: 31,
@@ -70,7 +70,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 128, // Excede 0..127
-            seculo: "A",
+            seculo: "Z",
             ano: 26,
             mes: 1,
             dia: 1,
@@ -87,7 +87,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: -1,
-            seculo: "A",
+            seculo: "Z",
             ano: 26,
             mes: 1,
             dia: 1,
@@ -105,10 +105,10 @@ void main() {
     // 2. TESTES DE VALIDAÇÃO DE SÉCULO
     // ============================================================
     group('Validação do Século (Ciclo de 1500 Anos)', () {
-      test('Século A (2000-2099) deve ser válido', () {
+      test('Século Z (2000-2099) deve ser válido', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "A",
+          seculo: "Z",
           ano: 26,
           mes: 1,
           dia: 1,
@@ -118,14 +118,14 @@ void main() {
           microssegundos: 0,
         );
         final data = JecEnterprise64Bit.unpack(packed);
-        expect(data['seculo'], equals('A'));
+        expect(data['seculo'], equals('Z'));
         expect(data['seculoIdx'], equals(0));
       });
 
       test('Século Q (3400-3499) deve ser válido (último do ciclo)', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "Q",
+          seculo: "P",
           ano: 99,
           mes: 12,
           dia: 31,
@@ -135,7 +135,7 @@ void main() {
           microssegundos: 999999,
         );
         final data = JecEnterprise64Bit.unpack(packed);
-        expect(data['seculo'], equals('Q'));
+        expect(data['seculo'], equals('P'));
         expect(data['seculoIdx'], equals(14));
       });
 
@@ -143,7 +143,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "R",
+            seculo: "Z",
             ano: 0,
             mes: 1,
             dia: 1,
@@ -159,7 +159,7 @@ void main() {
       test('Século com letra minúscula deve ser convertido para maiúscula', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "v",
+          seculo: "k",
           ano: 0,
           mes: 1,
           dia: 1,
@@ -169,7 +169,7 @@ void main() {
           microssegundos: 0,
         );
         final data = JecEnterprise64Bit.unpack(packed);
-        expect(data['seculo'], equals('V'));
+        expect(data['seculo'], equals('K'));
       });
 
       test('Século com letra inválida (I ou O) deve lançar ArgumentError', () {
@@ -227,7 +227,7 @@ void main() {
         for (int mes = 1; mes <= 12; mes++) {
           final int packed = JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: mes,
             dia: 1,
@@ -237,7 +237,7 @@ void main() {
             microssegundos: 0,
           );
           final String human = JecEnterprise64Bit.unpackToHumanString(packed, alias: "TEST");
-          // Formato: TEST.A000X?0000.000000 (onde ? é o mês)
+          // Formato: TEST.Z000X?0000.000000 (onde ? é o mês)
           final String mesChar = human[9]; // Posição do mês na string
           expect(mesChar, equals(expected[mes]));
         }
@@ -247,7 +247,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 0,
             dia: 1,
@@ -264,7 +264,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 13,
             dia: 1,
@@ -293,7 +293,7 @@ void main() {
         for (int dia = 1; dia <= 24; dia++) {
           final int packed = JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 1,
             dia: dia,
@@ -320,7 +320,7 @@ void main() {
           
           final int packed = JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: mes,
             dia: diaValido,
@@ -339,7 +339,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 1,
             dia: 0,
@@ -356,7 +356,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 1,
             dia: 32,
@@ -373,7 +373,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 2,
             dia: 30,
@@ -402,7 +402,7 @@ void main() {
         for (int hora = 0; hora < 24; hora++) {
           final int packed = JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 1,
             dia: 1,
@@ -421,7 +421,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 1,
             dia: 1,
@@ -438,7 +438,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 1,
             dia: 1,
@@ -459,7 +459,7 @@ void main() {
       test('Ano no limite mínimo (0) deve funcionar', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "A",
+          seculo: "Z",
           ano: 0,
           mes: 1,
           dia: 1,
@@ -475,7 +475,7 @@ void main() {
       test('Ano no limite máximo (99) deve funcionar', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "A",
+          seculo: "Z",
           ano: 99,
           mes: 12,
           dia: 31,
@@ -492,7 +492,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 100,
             mes: 1,
             dia: 1,
@@ -508,7 +508,7 @@ void main() {
       test('Minuto no limite máximo (59) deve funcionar', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "A",
+          seculo: "Z",
           ano: 0,
           mes: 1,
           dia: 1,
@@ -525,7 +525,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 1,
             dia: 1,
@@ -541,7 +541,7 @@ void main() {
       test('Microssegundo no limite máximo (999999) deve funcionar', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "A",
+          seculo: "Z",
           ano: 0,
           mes: 1,
           dia: 1,
@@ -558,7 +558,7 @@ void main() {
         expect(
           () => JecEnterprise64Bit.pack(
             headerBits: 0,
-            seculo: "A",
+            seculo: "Z",
             ano: 0,
             mes: 1,
             dia: 1,
@@ -578,9 +578,9 @@ void main() {
     group('Testes de Simetria (Round-Trip)', () {
       test('Deve manter a integridade exata após empacotar e desempacotar', () {
         final testCases = [
-          {'header': 0, 'seculo': 'A', 'ano': 0, 'mes': 1, 'dia': 1, 'hora': 0, 'minuto': 0, 'segundo': 0, 'mcs': 0},
-          {'header': 127, 'seculo': 'Q', 'ano': 99, 'mes': 12, 'dia': 31, 'hora': 23, 'minuto': 59, 'segundo': 59, 'mcs': 999999},
-          {'header': 99, 'seculo': 'A', 'ano': 26, 'mes': 9, 'dia': 30, 'hora': 23, 'minuto': 53, 'segundo': 14, 'mcs': 421983},
+          {'header': 0, 'seculo': 'Z', 'ano': 0, 'mes': 1, 'dia': 1, 'hora': 0, 'minuto': 0, 'segundo': 0, 'mcs': 0},
+          {'header': 127, 'seculo': 'P', 'ano': 99, 'mes': 12, 'dia': 31, 'hora': 23, 'minuto': 59, 'segundo': 59, 'mcs': 999999},
+          {'header': 99, 'seculo': 'Z', 'ano': 26, 'mes': 9, 'dia': 30, 'hora': 23, 'minuto': 53, 'segundo': 14, 'mcs': 421983},
           {'header': 42, 'seculo': 'V', 'ano': 26, 'mes': 9, 'dia': 3, 'hora': 22, 'minuto': 50, 'segundo': 15, 'mcs': 123456},
           {'header': 7, 'seculo': 'M', 'ano': 5, 'mes': 6, 'dia': 15, 'hora': 8, 'minuto': 30, 'segundo': 45, 'mcs': 98765},
         ];
@@ -614,7 +614,7 @@ void main() {
 
       test('Deve produzir a mesma string visual para a mesma entrada', () {
         const int header = 99;
-        const String seculo = 'A';
+        const String seculo = 'Z';
         const int ano = 26;
         const int mes = 9;
         const int dia = 30;
@@ -650,11 +650,11 @@ void main() {
         expect(packed1, equals(packed2));
         expect(
           JecEnterprise64Bit.unpackToHumanString(packed1, alias: "LOG"),
-          equals("LOG.A26J0Y5314.421983"),
+          equals("LOG.Z26J0Y5314.421983"),
         );
         expect(
           JecEnterprise64Bit.unpackToHumanString(packed2, alias: "LOG"),
-          equals("LOG.A26J0Y5314.421983"),
+          equals("LOG.Z26J0Y5314.421983"),
         );
       });
     });
@@ -666,7 +666,7 @@ void main() {
       test('Deve preservar o alias na string visual', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 99,
-          seculo: "A",
+          seculo: "Z",
           ano: 26,
           mes: 9,
           dia: 30,
@@ -678,13 +678,13 @@ void main() {
 
         final String result = JecEnterprise64Bit.unpackToHumanString(packed, alias: "SERVIDOR01");
         expect(result.startsWith("SERVIDOR01."), isTrue);
-        expect(result, equals("SERVIDOR01.A26J0Y5314.421983"));
+        expect(result, equals("SERVIDOR01.Z26J0Y5314.421983"));
       });
 
       test('Alias vazio deve usar "A" como padrão', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "A",
+          seculo: "Z",
           ano: 0,
           mes: 1,
           dia: 1,
@@ -695,13 +695,13 @@ void main() {
         );
 
         final String result = JecEnterprise64Bit.unpackToHumanString(packed, alias: "");
-        expect(result.startsWith("A."), isTrue);
+        expect(result.startsWith("Z."), isTrue);
       });
 
       test('Alias com espaços deve ser sanitizado', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 0,
-          seculo: "A",
+          seculo: "Z",
           ano: 0,
           mes: 1,
           dia: 1,
@@ -726,7 +726,7 @@ void main() {
         for (int i = 0; i < 100000; i++) {
           final int packed = JecEnterprise64Bit.pack(
             headerBits: i % 128,
-            seculo: JecEnterprise64Bit.alphaTable[i % 15], // A-Q apenas
+            seculo: JecEnterprise64Bit.alphaTable[i % 15], // Z-P apenas
             ano: i % 100,
             mes: (i % 12) + 1,
             dia: (i % 28) + 1, // Garante data válida em todos os meses
@@ -755,7 +755,7 @@ void main() {
     group('Validação de Integridade Binária', () {
       test('Deve produzir valor binário determinístico para a mesma entrada', () {
         const int header = 99;
-        const String seculo = 'A';
+        const String seculo = 'Z';
         const int ano = 26;
         const int mes = 9;
         const int dia = 30;
@@ -795,7 +795,7 @@ void main() {
       test('Deve ocupar exatamente 64 bits (8 bytes)', () {
         final int packed = JecEnterprise64Bit.pack(
           headerBits: 127,
-          seculo: "Q",
+          seculo: "P",
           ano: 99,
           mes: 12,
           dia: 31,
