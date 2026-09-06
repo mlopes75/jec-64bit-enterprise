@@ -5,21 +5,22 @@ import "./JecEnterprise64BitPacker.sol";
 
 /**
  * @title JecAuditoriaEVM
- * @notice Contrato de auditoria on-chain imutável baseado em block.timestamp e JEC 64-Bit.
- * @dev Otimizado para menor consumo de gas no deployment e na execução.
+ * @author mlopes75
+ * @notice Contrato de auditoria on-chain imutável - VERSÃO ULTRA OTIMIZADA
+ * @dev Otimizado para mínimo consumo de gas
  */
 contract JecAuditoriaEVM {
     using JecEnterprise64BitPacker for uint64;
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CUSTOM ERRORS (Economia substancial de bytecode e gas de erro)
+    // CUSTOM ERRORS (Sem parâmetros para máximo savings)
     // ═══════════════════════════════════════════════════════════════════════════
-    error JecServidorExcede6Bits();
+    error JecServidorExcede7Bits();
     error JecMicrossegundosExcede20Bits();
-    error JecCheckpointJaExiste(uint64 jecTimestamp);
+    error JecCheckpointJaExiste();
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // EVENTOS & ESTADO
+    // EVENTOS (Indexados para busca eficiente)
     // ═══════════════════════════════════════════════════════════════════════════
     event CheckpointRegistado(
         uint64 indexed headerBits, 
@@ -27,19 +28,34 @@ contract JecAuditoriaEVM {
         address indexed operador
     );
 
-    // Mapeamento otimizado para bool (EVM usa 32 bytes por slot em mappings)
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ESTADO (Otimizado para mínimo de slots)
+    // ═══════════════════════════════════════════════════════════════════════════
+    
+    /// @dev Mapeamento de checkpoints (1 slot por chave)
     mapping(uint64 => bool) public checkpoints;
+    
+    /// @dev Contador total (1 slot)
+    uint256 public totalCheckpoints;
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // FUNÇÃO PRINCIPAL
+    // FUNÇÃO PRINCIPAL (Otimizada)
     // ═══════════════════════════════════════════════════════════════════════════
+    
+    /**
+     * @notice Registra checkpoint com mínimo de gas.
+     * @param codigoServidor 0-127 (7 bits)
+     * @param microssegundos 0-999999 (20 bits)
+     */
     function registarCheckpoint(
         uint64 codigoServidor,
         uint64 microssegundos
     ) external returns (uint64 jecTimestamp) {
-        if (codigoServidor > 63) revert JecServidorExcede6Bits();
+        // Validações com custom errors (sem parâmetros = mais barato)
+        if (codigoServidor > 127) revert JecServidorExcede7Bits();
         if (microssegundos > 999_999) revert JecMicrossegundosExcede20Bits();
 
+        // Extração do timestamp
         (
             uint64 seculoIdx, 
             uint64 ano, 
@@ -50,6 +66,7 @@ contract JecAuditoriaEVM {
             uint64 segundo
         ) = _converterTimestamp(block.timestamp);
 
+        // Empacotamento
         jecTimestamp = JecEnterprise64BitPacker.pack(
             codigoServidor,
             seculoIdx,
@@ -62,20 +79,34 @@ contract JecAuditoriaEVM {
             microssegundos
         );
 
-        if (checkpoints[jecTimestamp]) revert JecCheckpointJaExiste(jecTimestamp);
+        // Prevenção de duplicata (com custom error sem parâmetros)
+        if (checkpoints[jecTimestamp]) revert JecCheckpointJaExiste();
         
+        // Armazenamento
         checkpoints[jecTimestamp] = true;
+        unchecked { totalCheckpoints++; } // Economiza gas
+
+        // Evento
         emit CheckpointRegistado(codigoServidor, jecTimestamp, msg.sender);
 
         return jecTimestamp;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CONSULTAS OFF-CHAIN
+    // FUNÇÕES DE CONSULTA (View/Pure = zero gas)
     // ═══════════════════════════════════════════════════════════════════════════
+
     function checkpointExiste(uint64 jecTimestamp) external view returns (bool) {
         return checkpoints[jecTimestamp];
     }
+
+    function getTotalCheckpoints() external view returns (uint256) {
+        return totalCheckpoints;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONVERSÃO DE TIMESTAMP (Otimizada para chamadas externas)
+    // ═══════════════════════════════════════════════════════════════════════════
 
     function converterTimestampPublico(uint256 timestamp) 
         external 
@@ -94,8 +125,13 @@ contract JecAuditoriaEVM {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // FUNÇÕES INTERNAS OTIMIZADAS
+    // FUNÇÃO INTERNA (Core da conversão - otimizada)
     // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @dev Converte timestamp Unix para componentes JEC.
+     * O ciclo de 1500 anos começa em 2000.
+     */
     function _converterTimestamp(uint256 timestamp) 
         internal 
         pure 
@@ -109,12 +145,26 @@ contract JecAuditoriaEVM {
             uint64 segundo
         ) 
     {
+        // Obter data a partir dos dias
         uint256 yearFull;
         (yearFull, mes, dia) = _daysToDate(timestamp / 86400);
 
+        // Extrair ano (0-99)
         ano = uint64(yearFull % 100);
-        seculoIdx = uint64((yearFull / 100) % 25);
+        
+        // 🎯 Mapeamento para ciclo de 1500 anos (2000-3499)
+        // Usando assembly para operação matemática mais barata
+        uint256 seculo = yearFull / 100;
+        assembly {
+            // if (seculo >= 20) { seculoIdx = (seculo - 20) % 15 } else { seculoIdx = 0 }
+            let diff := sub(seculo, 20)
+            let isAfter := gt(diff, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+            // Se diff for negativo (seculo < 20), é 0, senão diff % 15
+            let modVal := mod(diff, 15)
+            seculoIdx := mul(isAfter, modVal)
+        }
 
+        // Extrair hora, minuto, segundo
         uint256 secondsInDay = timestamp % 86400;
         hora = uint64(secondsInDay / 3600);
         minuto = uint64((secondsInDay % 3600) / 60);
@@ -122,22 +172,32 @@ contract JecAuditoriaEVM {
     }
 
     /**
-     * @dev Algoritmo Fliegel-Van Flandern otimizado em uint256 para evitar mutações de sinal int256.
+     * @dev Algoritmo Fliegel-Van Flandern com uint256 puro (mais barato que int256).
      */
     function _daysToDate(uint256 _days) internal pure returns (uint256 year, uint64 month, uint64 day) {
-        uint256 L = _days + 68569 + 2440588;
-        uint256 N = (4 * L) / 146097;
-        L = L - (146097 * N + 3) / 4;
-        uint256 _year = (4000 * (L + 1)) / 1461001;
-        L = L - (1461 * _year) / 4 + 31;
-        uint256 _month = (80 * L) / 2447;
-        uint256 _day = L - (2447 * _month) / 80;
-        L = _month / 11;
-        _month = _month + 2 - 12 * L;
-        _year = 100 * (N - 49) + _year + L;
+        uint256 z = _days + 719468;
+        uint256 era = (z >= 0 ? z : z - 146096) / 146097;
+        uint256 doe = z - era * 146097;
+        uint256 yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365;
+        uint256 y = yoe + era * 400;
+        uint256 doy = doe - (365*yoe + yoe/4 - yoe/100);
+        uint256 mp = (5*doy + 2)/153;
+        uint256 d = doy - (153*mp + 2)/5 + 1;
+        uint256 m = mp + (mp < 10 ? 3 : 9);
+        year = y + (m <= 2 ? 1 : 0);
+        month = uint64(m);
+        day = uint64(d);
+    }
 
-        year = _year;
-        month = uint64(_month);
-        day = uint64(_day);
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FUNÇÃO PARA STRING VISUAL (Off-chain)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    function timestampParaString(uint64 jecTimestamp, string memory alias) 
+        external 
+        pure 
+        returns (string memory) 
+    {
+        return JecEnterprise64BitPacker.unpackToHumanString(jecTimestamp, alias);
     }
 }
