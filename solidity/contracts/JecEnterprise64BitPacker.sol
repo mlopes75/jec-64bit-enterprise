@@ -12,14 +12,12 @@ pragma solidity ^0.8.20;
  *  [ Header (7b) ][ Século (4b) ][ Ano (7b) ][ Mês (4b) ][ Dia (5b) ][ Hora (5b) ][ Min (6b) ][ Seg (6b) ][ Microssegundos (20b) ]
  *   63........57   56........53   52....46   45....42   41...37   36...32   31...26   25...20   19..................0
  * 
- *  Alfabeto JEC (24 letras, sem 'I' e 'O'): A=0, B=1, C=2, D=3, E=4, F=5, G=6, H=7, J=8, K=9, L=10, M=11, N=12, P=13, Q=14
- * 
  *  ═══════════════════════════════════════════════════════════════════════════════
  *  🕐 FILOSOFIA DO CICLO DE 1500 ANOS
  *  ═══════════════════════════════════════════════════════════════════════════════
  * 
  *  O JEC opera em ciclos de 1500 anos (15 séculos × 100 anos).
- *  Séculos válidos: A (2000) até Q (3400)
+ *  Séculos válidos: Z (2000) até P (3400)
  * 
  *  ═══════════════════════════════════════════════════════════════════════════════
  *  📅 MAPEAMENTO HÍBRIDO DOS DIAS
@@ -41,14 +39,14 @@ library JecEnterprise64BitPacker {
     // CONSTANTES
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// @notice Alfabeto JEC (24 letras, sem I e O)
-    bytes24 private constant ALPHA_TABLE = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    /// @notice Alfabeto JEC (24 letras, sem I e O) - Z=0 (século 2000)
+    bytes24 private constant ALPHA_TABLE = "ZABCDEFGHJKLMNPQRSTUVWXY";
 
     /// @notice Mapeamento de meses (A=Jan, B=Fev, ..., M=Dez)
     bytes12 private constant MAP_MES = "ABCDEFGHJKLM";
 
     /// @notice Mapeamento de dias (A-Z para 1-24, 5-1 para 25-31)
-    bytes31 private constant MAP_DIA = "ABCDEFGHJKLMNPQRSTUVWXYZ123456";
+    bytes31 private constant MAP_DIA = "ABCDEFGHJKLMNPQRSTUVWXYZ5678901";
 
     /// @notice Mapeamento de horas (Z=00, A=01, ..., Y=23)
     bytes24 private constant MAP_HORA = "ZABCDEFGHJKLMNPQRSTUVWXY";
@@ -60,10 +58,19 @@ library JecEnterprise64BitPacker {
     /**
      * @notice Empacota metadados e tempo em 64 bits.
      * @dev Alinhado com a implementação Dart.
+     * @param headerBits 0 a 127 (7 bits)
+     * @param seculo Z a P (0-14) - Z=2000, A=2100, ... P=3400
+     * @param ano 0 a 99 (7 bits)
+     * @param mes 1 a 12 (4 bits)
+     * @param dia 1 a 31 (5 bits)
+     * @param hora 0 a 23 (5 bits)
+     * @param minuto 0 a 59 (6 bits)
+     * @param segundo 0 a 59 (6 bits)
+     * @param microssegundos 0 a 999.999 (20 bits)
      */
     function pack(
         uint64 headerBits,     // 0 a 127 (7 bits)
-        string memory seculo,  // A a Q (0-14)
+        string memory seculo,  // Z a P (0-14)
         uint64 ano,            // 0 a 99 (7 bits)
         uint64 mes,            // 1 a 12 (4 bits)
         uint64 dia,            // 1 a 31 (5 bits)
@@ -82,9 +89,9 @@ library JecEnterprise64BitPacker {
         require(segundo <= 59, "JEC: Segundo invalido (0-59)");
         require(microssegundos <= 999_999, "JEC: Microssegundos excede 20 bits");
 
-        // 2. Validação do século
+        // 2. Validação do século (Z=0, A=1, ... P=14)
         uint64 seculoIdx = _getSeculoIndex(seculo);
-        require(seculoIdx <= 14, "JEC: Seculo invalido (A-Q apenas)");
+        require(seculoIdx <= 14, "JEC: Seculo invalido (Z-P apenas)");
 
         // 3. Validação semântica de data
         uint256 anoAbsoluto = 2000 + (uint256(seculoIdx) * 100) + uint256(ano);
@@ -104,6 +111,7 @@ library JecEnterprise64BitPacker {
 
     /**
      * @notice Empacota usando índice de século (para compatibilidade com contratos)
+     * @param seculoIdx 0 a 14 (4 bits) - 0=Z(2000), 1=A(2100), ... 14=P(3400)
      */
     function packWithIdx(
         uint64 headerBits,     // 0 a 127 (7 bits)
@@ -241,7 +249,9 @@ library JecEnterprise64BitPacker {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Retorna o caractere do século (A-Q).
+     * @notice Retorna o caractere do século (Z-P).
+     * @param idx Índice do século (0-14)
+     * @return string Caractere do século (Z, A, B, ... P)
      */
     function _getSeculoChar(uint64 idx) private pure returns (string memory) {
         bytes24 alpha = ALPHA_TABLE;
@@ -251,6 +261,8 @@ library JecEnterprise64BitPacker {
 
     /**
      * @notice Retorna o índice do século (0-14).
+     * @param seculo String com o caractere do século (Z, A, B, ... P)
+     * @return uint64 Índice do século (0-14)
      */
     function _getSeculoIndex(string memory seculo) private pure returns (uint64) {
         bytes1 char = bytes(seculo)[0];
@@ -266,7 +278,7 @@ library JecEnterprise64BitPacker {
                 return i;
             }
         }
-        revert("JEC: Seculo nao encontrado no alfabeto");
+        revert("JEC: Seculo nao encontrado no alfabeto (Z-P)");
     }
 
     /**
