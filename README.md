@@ -31,16 +31,16 @@ Este repositório é um ambiente unificado (monorepo) contendo as implementaçõ
 
 ⏳ Especificação do Ciclo Temporal e Alfabeto Limpo
 
-O JEC Enterprise assume um ciclo determinístico de 1500 anos de longevidade total (dividido em 15 blocos lineares de 100 anos), iniciando a sua época na letra A no ano 2000.
+O JEC Enterprise assume um ciclo determinístico de 1500 anos de longevidade total (dividido em 15 blocos lineares de 100 anos), iniciando a sua época na letra Z no ano 2000.
 = Para erradicar a ambiguidade visual clássica dos computadores, o alfabeto de suporte foi severamente limpo, banindo em definitivo as letras "O" (confundível com zero) e "I" (confundível com o número um), restando 24 letras puras:
 - **[A, B, C, D, E, F, G, H, J, K, L, M, N, P, Q, R, S, T, U, V, W, X, Y, Z]**
   
 🗺️ Mapeamento do Século (Ciclo de 1500 Anos)
 
-O campo de 4 bits utiliza as primeiras 15 letras (de A a Q) para cobrir o ciclo completo:
-- A: Anos 2000 a 2099 (2026 está neste bloco)
-- B até P: Séculos seguintes intercalados.
-- Q: Anos 3400 a 3499 (Fecho do ciclo de 1500 anos na 15ª posição)
+O campo de 4 bits utiliza as primeiras 15 letras (de Z a P) para cobrir o ciclo completo:
+- Z: Anos 2000 a 2099 (2026 está neste bloco)
+- A até N: Séculos seguintes intercalados.
+- P: Anos 3400 a 3499 (Fecho do ciclo de 1500 anos na 15ª posição)
 Nota: A 16ª posição binária (1111) fica reservada para expansão ou metadados de overflow.
 
 ## 📅 Mapeamento Híbrido dos Dias (Segurança Visual Anticolisão)
@@ -92,7 +92,7 @@ Y = 23:00 (23h - última hora do dia)
 | Campo | Bits | Range | Mapeamento | Exemplo |
 | :---- | :--: | :---- | :--------- | :------ |
 | **Header/User Space** | 7 bits | 0-127 | Espaço livre do utilizador | 99 = ID do microsserviço |
-| **Século** | 4 bits | 0-14 (A-Q) | A=2000, B=2100, C=2200, D=2300, E=2400, F=2500, G=2600, H=2700, J=2800, K=2900, L=3000, M=3100, N=3200, P=3300, Q=3400 | A = 2000-2099 |
+| **Século** | 4 bits | 0-14 (Z-N) | Z=2000, A=2100, B=2200, C=2300, D=2400, E=2500, F=2600, G=2700, H=2800, J=2900, K=3000, L=3100, M=3200, N=3300, P=3400 | Z = 2000-2099 |
 | **Ano** | 7 bits | 00-99 | Valor numérico puro | 26 = 2026 |
 | **Mês** | 4 bits | 1-12 (A-M) | A=Jan, B=Fev, C=Mar, D=Abr, E=Mai, F=Jun, G=Jul, H=Ago, J=Set, K=Out, L=Nov, M=Dez | J = Setembro |
 | **Dia** | 5 bits | 1-31 | 1-24=Letras (A-Z), 25-31=Números (5-1) | 0 = Dia 30 |
@@ -109,7 +109,7 @@ void main() {
   // Exemplo para o ano de 2026 (Século A, Ano 26) e Dia 30
   final int packed = JecEnterprise64Bit.pack(
     headerBits: 99,     // 7 bits (0-127)
-    seculo: "A",        // Ciclo de 1500 anos (Bloco 2000-2099)
+    seculo: "Z",        // Ciclo de 1500 anos (Bloco 2000-2099)
     ano: 26,
     mes: 9,             // Setembro = J (A=1, B=2, ... H=8, J=9)
     dia: 30,            // Dias 25-31 = último dígito (30 = '0')
@@ -120,7 +120,7 @@ void main() {
   );
 
   print(JecEnterprise64Bit.unpackToHumanString(packed, alias: "LOG"));
-  // Saída: "LOG.A26J0Y5314.421983"
+  // Saída: "LOG.Z26J0Y5314.421983"
 }
 ```
 🎯 2. Camada Solidity (Ethereum / EVM)
