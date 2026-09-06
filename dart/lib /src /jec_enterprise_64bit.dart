@@ -6,7 +6,7 @@ class JecEnterprise64Bit {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /// Alfabeto Limpo JEC: 24 letras (A-Z, sem 'I' e 'O')
-  static const String alphaTable = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  static const String alphaTable = "ZABCDEFGHJKLMNPQRSTUVWXY";
 
   /// Mês (1..12):
   /// A=Jan, B=Fev, C=Mar, D=Abr, E=Mai, F=Jun, G=Jul, H=Ago, J=Set, K=Out, L=Nov, M=Dez
@@ -14,7 +14,7 @@ class JecEnterprise64Bit {
 
   /// Dia (1..31):
   /// A..Z = 1..24, 5..1 = 25..31
-  static const String mapDia = "ABCDEFGHJKLMNPQRSTUVWXYZ123456";
+  static const String mapDia = "ABCDEFGHJKLMNPQRSTUVWXYZ5678901";
 
   /// Hora (0..23):
   /// Z=00, A=01, B=02, ... Y=23
