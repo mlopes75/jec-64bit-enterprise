@@ -5,8 +5,31 @@ O **Ecossistema JEC Enterprise** é uma extensão de infraestrutura de alta perf
 Este repositório é um ambiente unificado (monorepo) contendo as implementações oficiais para **Dart (Backend/Fluxos de Dados)** e **Solidity (Web3/EVM)**, garantindo persistência e transmissão cross-platform 100% simétrica.
 
 > ⚠️ **Nota sobre longevidade:** "O JEC assume um ciclo de 1500 anos; para diferenciar ciclos, use os bits de User Space ou mantenha contexto externo de época."
+>
+> 💡 **Nota sobre parsing:** A representação string do JEC é otimizada para leitura humana e memorização. Para qualquer operação automatizada (comparação, ordenação, armazenamento), use sempre o valor `uint64` binário subjacente. A string é derivada do binário, nunca o contrário. 
 
 *Dedicado em homenagem à minha filha Julia pelo tempo que nos foi tirado.*
+
+## 🎯 Problema de Design Resolvido
+
+O JEC Enterprise foi concebido para resolver a **colisão de aliases 
+em sistemas distribuídos** sem sacrificar legibilidade humana.
+
+> **Cenário:** Dois usuários distintos, ambos chamados "João", 
+> criam o alias `João.JEC` em serviços diferentes.
+> 
+> **Sem JEC:** Colisão garantida. Requer tabela de mapeamento 
+> externa, UUIDs opacos, ou namespaces hierárquicos complexos.
+> 
+> **Com JEC:** `João.Z26J0Y5314.421983` vs 
+> `João.Z26J0Y5314.421984` — temporalidade incorporada 
+> desambigui automaticamente. Mesmo no mesmo microssegundo, 
+> o header de 7 bits (ID do serviço) garante unicidade 
+> cross-plataforma.
+
+**O JEC não compete com Unix Timestamp.**
+O Unix resolve "quando". O JEC resolve "quem + quando + onde, 
+de forma que um humano possa ler e lembrar."
 
 ---
 
@@ -78,12 +101,12 @@ Horas 00 a 23 (Letras): Representadas sequencialmente pelas letras do alfabeto l
 
 | Hora | Letra | Hora | Letra | Hora | Letra | Hora | Letra |
 | :-: | :---: | :-: | :---: | :-: | :---: | :-: | :---: |
-| 00 | Z | 06 | G | 12 | M | 18 | T |
-| 01 | A | 07 | H | 13 | N | 19 | U |
-| 02 | B | 08 | J | 14 | P | 20 | V |
-| 03 | C | 09 | K | 15 | Q | 21 | W |
-| 04 | D | 10 | L | 16 | R | 22 | X |
-| 05 | E | 11 | M | 17 | S | 23 | Y |
+| 00 | Z | 06 | F | 12 | M | 18 | T |
+| 01 | A | 07 | G | 13 | N | 19 | U |
+| 02 | B | 08 | H | 14 | P | 20 | V |
+| 03 | C | 09 | J | 15 | Q | 21 | W |
+| 04 | D | 10 | K | 16 | R | 22 | X |
+| 05 | E | 11 | L | 17 | S | 23 | Y |
 
 Y = 23:00 (23h - última hora do dia)
 
@@ -106,7 +129,7 @@ Y = 23:00 (23h - última hora do dia)
 🎯 Exemplo de Uso Atualizado (Camada Dart)
 ```
 void main() {
-  // Exemplo para o ano de 2026 (Século A, Ano 26) e Dia 30
+  // Exemplo para o ano de 2026 (Século Z, Ano 26) e Dia 30
   final int packed = JecEnterprise64Bit.pack(
     headerBits: 99,     // 7 bits (0-127)
     seculo: "Z",        // Ciclo de 1500 anos (Bloco 2000-2099)
@@ -124,7 +147,8 @@ void main() {
 }
 ```
 🎯 2. Camada Solidity (Ethereum / EVM)
-- Localizada na pasta /solidity, a biblioteca foi desenvolvida com foco em Gas Optimization, permitindo salvar múltiplos parâmetros de tempo gastando apenas um slot de memória (uint64).
+
+- "Na EVM, um uint64 ocupa um slot de 256 bits, mas permite que múltiplos campos JEC sejam empacotados junto com outros dados no mesmo slot via bit packing manual, ou que o valor seja passado eficientemente entre funções como parâmetro de 64 bits (mais barato em calldata/memory que uint256)."
 
 📊 Métricas de Impacto em Larga Escala
 
@@ -148,14 +172,10 @@ e
 ```
 dart test test/jec_enterprise_integrity_test.dart
 ```
-- - 📦 Repositórios do Ecossistema jec-sistema-julia-epoch-compact. 
-- - - Algoritmo base focado em representação visual e strings.jec-64bit-enterprise
-- - - Este repositório focado em arquitetura binária e Web3.
 + 📦 **Repositórios do Ecossistema**
 + - **jec-sistema-julia-epoch-compact**: Algoritmo base focado em representação visual e strings.
 + - **jec-64bit-enterprise**: Este repositório focado em arquitetura binária e Web3.
 
 📄 Licença
-Este projeto está licenciado sob a Licença MIT 
-- consulte o arquivo LICENSE.md para detalhes.
+Este projeto está licenciado sob a Licença MIT - consulte o arquivo LICENSE.md para detalhes.
 
