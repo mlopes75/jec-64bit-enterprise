@@ -170,14 +170,16 @@ void main() {
 
 - "Na EVM, um uint64 ocupa um slot de 256 bits, mas permite que múltiplos campos JEC sejam empacotados junto com outros dados no mesmo slot via bit packing manual, ou que o valor seja passado eficientemente entre funções como parâmetro de 64 bits (mais barato em calldata/memory que uint256)."
 
-📊 Métricas de Impacto em Larga Escala
+## 📊 Métricas de Impacto em Larga Escala
 
-| Formato Usado               |     Pegada em Dados    |                 Comparação Estrutural                 |   Espaço p/ Metadados   |
-| :-------------------------- | :--------------------: | :---------------------------------------------------: | :---------------------: |
-| **ISO-8601 String**         |      ~20–32 Bytes      |               Texto, parsing necessário               |         ❌ Nenhum        |
-| **Unix Epoch (`uint64`)**   |         8 Bytes        |               Apenas timestamp absoluto               |         ❌ Nenhum        |
-| **Unix + Contexto Externo** |        ≥ 9 Bytes       |             Requer armazenamento adicional            |       ⚠️ Separado       |
-| **💎 JEC Enterprise**       | **8 Bytes (`uint64`)** | **Contexto + Timestamp estruturado + Microssegundos** | **✅ 7 bits integrados** |
+| Característica | JEC Enterprise | Unix Timestamp | ISO-8601 | UUID v7 |
+|----------------|:--------------:|:--------------:|:--------:|:-------:|
+| **Tamanho** | 8 bytes | 8 bytes | 20-32 bytes | 16 bytes |
+| **Legibilidade** | ✅ Alta | ❌ Baixa | ✅ Alta | ❌ Baixa |
+| **Contexto** | ✅ Estrutural | ❌ Apenas tempo | ✅ Completo | ⚠️ Parcial |
+| **Microssegundos** | ✅ Sim | ⚠️ Opcional | ✅ Sim | ✅ Sim |
+| **Metadados** | ✅ 7 bits integrados | ❌ Não | ❌ Não | ❌ Não |
+| **Ordenação** | ✅ Sim (uint64) | ✅ Sim | ❌ String | ✅ Sim |
 
 
 ⚡ Vantagem do JEC Enterprise: enquanto um Unix Timestamp de 64 bits utiliza todos os seus bits exclusivamente para representar um instante temporal, o JEC Enterprise utiliza os mesmos 64 bits para encapsular data estruturada, hora, precisão de microssegundos e 7 bits de metadados contextualizáveis, sem aumentar o tamanho do valor armazenado.
