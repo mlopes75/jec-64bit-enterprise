@@ -6,9 +6,10 @@ Este repositório é um ambiente unificado (monorepo) contendo as implementaçõ
 
 > ⚠️ **Nota sobre longevidade:** "O JEC assume um ciclo de 1500 anos; para diferenciar ciclos, use os bits de User Space ou mantenha contexto externo de época."
 >
-> 💡 **Nota sobre parsing:** A representação string do JEC é otimizada para leitura humana e memorização. Para qualquer operação automatizada (comparação, ordenação, armazenamento), use sempre o valor `uint64` binário subjacente. A string é derivada do binário, nunca o contrário. 
+> 💡 **Nota sobre parsing:** A representação string do JEC é otimizada para leitura humana e memorização. Para qualquer operação automatizada (comparação, ordenação, armazenamento), use sempre o valor `uint64` binário subjacente. A string é derivada do binário, nunca o contrário.
+>
 
-*Dedicado em homenagem à minha filha Julia pelo tempo que nos foi tirado.*
+### *Dedicado em homenagem à minha filha Julia pelo tempo que nos foi tirado.*
 
 ## 🎯 Problema de Design Resolvido
 
@@ -64,7 +65,26 @@ O campo de 4 bits utiliza as primeiras 15 letras (de Z a P) para cobrir o ciclo 
 - Z: Anos 2000 a 2099 (2026 está neste bloco)
 - A até N: Séculos seguintes intercalados.
 - P: Anos 3400 a 3499 (Fecho do ciclo de 1500 anos na 15ª posição)
-Nota: A 16ª posição binária (1111) fica reservada para expansão ou metadados de overflow.
+
+> ### Caso Especial: Século 20 ('Y')
+> O valor binário máximo de 4 bits (`1111` ou `15` em decimal) foi reservado como um **Código de Exceção** para o século 20:
+> * **Código:** `1111` (`0b1111`)
+> * **Representação:** Letra `Y` (Anos 1900 a 1999)
+
+## Tabela de Correspondência de Bits do Século
+
+| Valor Binário | Valor Decimal | Letra Correspondente | Século / Ciclo |
+| :--- | :--- | :--- | :--- |
+| `0000` | 0 | Z | Ciclo Padrão de 1500 anos |
+| `0001` | 1 | A | Ciclo Padrão de 1500 anos |
+| `0010` | 2 | B | Ciclo Padrão de 1500 anos |
+| ... | ... | ... | ... |
+| `1110` | 14 | P | Ciclo Padrão de 1500 anos |
+| **`1111`** | **15** | **Y** | **Caso Especial: Século 20 (1900-1999)¹** |
+
+---
+*¹ **Nota de Implementação:** O valor `1111` é um código de exceção explícito. Ele é tratado isoladamente por condicionais (`if/else`) no código Dart para manter a lista do ciclo padrão puramente com 1500 anos.*
+
 
 ## 📅 Mapeamento Híbrido dos Dias (Segurança Visual Anticolisão)
 
