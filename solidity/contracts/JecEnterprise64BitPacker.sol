@@ -23,11 +23,20 @@ pragma solidity ^0.8.20;
  *  ═══════════════════════════════════════════════════════════════════════════════
  *  Dias 1-24: A-Z (Sem I e O, onde 1=A, 2=B, ..., 24=Z).
  *  Dias 25-31: 5,6,7,8,9,0,1 (Mapeamento pelo último dígito).
+ * 
+ *  ═══════════════════════════════════════════════════════════════════════════════
+ *  🔧 SEPARAÇÃO DE RESPONSABILIDADES (OTIMIZAÇÃO DE GAS)
+ *  ═══════════════════════════════════════════════════════════════════════════════
+ *  - Funções de protocolo (pack, packWithIdx, unpack) : destinadas a contratos on-chain,
+ *    com mínimo consumo de gas. Retornam dados brutos (uint64 ou tuplas).
+ *  - Funções de apresentação (unpackToHumanString) : para uso off-chain ou em views,
+ *    pois envolvem manipulação de strings (caro). Mantidas na mesma biblioteca,
+ *    mas documentadas como "off-chain friendly".
  */
 library JecEnterprise64BitPacker {
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CONSTANTES DO PROTOCOLO (ALFABETOS) - Armazenados como bytes para eficiência
+    // CONSTANTES DO PROTOCOLO (ALFABETOS)
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// @notice Ciclo padrão de 15 séculos (Exclui o 'Y' pois este virou código de exceção 15)
@@ -43,13 +52,21 @@ library JecEnterprise64BitPacker {
     bytes24 private constant MAP_HORA = "ZABCDEFGHJKLMNPQRSTUVWXY";
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 1. EMPACOTAMENTO (PACKING) - Protocolo puro
+    // 1. EMPACOTAMENTO (PACKING) - FUNÇÕES ON-CHAIN
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * @notice Empacota metadados e tempo em 64 bits utilizando a letra representativa do século.
-     * @dev Esta função valida o século através da string (custo gas adicional). Para maior eficiência,
-     *      use packWithIdx passando o índice diretamente.
+     * @param headerBits 7 bits (0-127)
+     * @param seculo String de exatamente 1 caractere (Z, A, B, ..., P, ou Y) em ASCII.
+     * @param ano 0-99
+     * @param mes 1-12
+     * @param dia 1-31
+     * @param hora 0-23
+     * @param minuto 0-59
+     * @param segundo 0-59
+     * @param microssegundos 0-999999
+     * @return uint64 valor empacotado
      */
     function pack(
         uint64 headerBits,
@@ -68,7 +85,6 @@ library JecEnterprise64BitPacker {
 
     /**
      * @notice Empacota usando o índice nativo do século (Proteção Estrita contra estouro de limites).
-     * @dev Esta é a versão otimizada para gas, pois não processa strings.
      */
     function packWithIdx(
         uint64 headerBits,
@@ -81,7 +97,7 @@ library JecEnterprise64BitPacker {
         uint64 segundo,
         uint64 microssegundos
     ) internal pure returns (uint64) {
-        // 1. Validações estritas de limites de negócio (Impede que a máscara mascare dados inválidos)
+        // 1. Validações estritas de limites de negócio
         require(headerBits <= 127, "JEC: Header excede 7 bits");
         require(seculoIdx <= 15, "JEC: Seculo idx invalido (max 15)");
         require(ano <= 99, "JEC: Ano excede 7 bits (max 99)");
@@ -108,12 +124,20 @@ library JecEnterprise64BitPacker {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 2. DESEMPACOTAMENTO (UNPACKING) - Protocolo puro
+    // 2. DESEMPACOTAMENTO (UNPACKING) - FUNÇÕES ON-CHAIN
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * @notice Desempacota o payload bruto de 64 bits aplicando máscaras de isolamento estrutural.
-     * @return Todos os campos extraídos como uint64, incluindo o índice do século.
+     * @return headerBits 7 bits
+     * @return seculoIdx 4 bits (0-15)
+     * @return ano 0-99
+     * @return mes 1-12
+     * @return dia 1-31
+     * @return hora 0-23
+     * @return minuto 0-59
+     * @return segundo 0-59
+     * @return microssegundos 0-999999
      */
     function unpack(uint64 packedValue) internal pure returns (
         uint64 headerBits,
@@ -149,17 +173,26 @@ library JecEnterprise64BitPacker {
         _validateDate(seculoIdx, ano, mes, dia);
     }
 
+    /**
+     * @notice Extrai apenas os bits de cabeçalho (7 bits superiores).
+     */
+    function extractHeaderBits(uint64 packedValue) internal pure returns (uint64) {
+        return (packedValue >> 57) & 0x7F;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
-    // 3. APRESENTAÇÃO (unpackToHumanString) - Camada separada, mais custosa
+    // 3. FUNÇÕES DE APRESENTAÇÃO (OFF-CHAIN / VIEW) - USO RESTRITO A STRINGS
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
      * @notice Desempacota e retorna a string visual idêntica à saída do ecossistema Dart.
-     * @dev Esta função realiza alocações de memória e é mais cara em gas; use apenas para logging ou UI.
-     *      O alias é usado literalmente, sem sanitização (compatível com Dart).
+     * @dev Esta função usa manipulação de strings e deve ser usada apenas em funções view ou fora da blockchain.
+     *      O alias é usado literalmente, sem sanitização (igual ao Dart).
      */
     function unpackToHumanString(uint64 packedValue, string memory alias) 
-        internal pure returns (string memory) 
+        internal 
+        pure 
+        returns (string memory) 
     {
         (
             ,
@@ -173,7 +206,7 @@ library JecEnterprise64BitPacker {
             uint64 microssegundos
         ) = unpack(packedValue);
 
-        // Constrói a string exatamente como no Dart: "$alias.$seculoChar$anoStr$mesChar$diaChar$horaChar$minStr$segStr.$microStr"
+        // Alias é usado exatamente como fornecido (pode ser vazio)
         return string(abi.encodePacked(
             alias, ".",
             _getSeculoChar(seculoIdx),
@@ -183,99 +216,82 @@ library JecEnterprise64BitPacker {
             _getHoraChar(hora),
             _padNumber(minuto, 2),
             _padNumber(segundo, 2),
-            ".",
+            ".", 
             _padNumber(microssegundos, 6)
         ));
     }
 
     /**
-     * @brief Versão com alias padrão vazio (equivale a "" no Dart).
-     * @dev No Dart, alias vazio resulta em string começando com ".".
-     *      Aqui, passamos "" explicitamente para manter compatibilidade.
+     * @notice Versão com alias vazio (produz string começando com ".").
      */
     function unpackToHumanStringDefault(uint64 packedValue) internal pure returns (string memory) {
         return unpackToHumanString(packedValue, "");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 4. UTILITÁRIO DE EXTRAÇÃO DE HEADER
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    function extractHeaderBits(uint64 packedValue) internal pure returns (uint64) {
-        return (packedValue >> 57) & 0x7F;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // 5. FUNÇÕES INTERNAS DE MAPEAMENTO (Puras e Otimizadas)
+    // 4. INTERNAL MAPPING UTILS (COM VALIDAÇÕES DE STRING)
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Converte índice do século (0-15) para caractere ASCII.
-     * @dev Espera-se que idx seja 0..14 para ciclo padrão, ou 15 para 'Y'.
-     */
-    function _getSeculoChar(uint64 idx) private pure returns (string memory) {
-        if (idx == 15) return "Y";
-        bytes15 cycle = STANDARD_CYCLE;
-        // O elenco para string é seguro, pois cycle[idx] é um byte ASCII.
-        return string(abi.encodePacked(cycle[idx]));
-    }
-
-    /**
-     * @notice Converte string (1 caractere) para índice do século.
-     * @dev Rejeita strings vazias ou com comprimento != 1.
-     *      Suporta letras maiúsculas e minúsculas ASCII, convertendo minúsculas para maiúsculas.
-     *      Letras válidas: Z, A-P (exceto I, O) e Y (exceção).
+     * @dev Converte string do século para índice (0-15) com validação rigorosa.
+     *      Espera exatamente 1 caractere ASCII.
+     *      Letras minúsculas são convertidas para maiúsculas.
+     *      'Y' → 15 (exceção), 'Z'→0, 'A'→1, ... 'P'→14.
+     * @param seculo String de 1 caractere (sem espaços)
+     * @return uint64 índice (0-15)
      */
     function _getSeculoIndex(string memory seculo) private pure returns (uint64) {
         bytes memory seculoBytes = bytes(seculo);
         require(seculoBytes.length == 1, "JEC: Seculo deve ter 1 caractere");
 
         bytes1 char = seculoBytes[0];
-        // Converter minúscula para maiúscula (ASCII)
+        // Converter minúsculo para maiúsculo (ASCII)
         if (char >= 'a' && char <= 'z') {
             char = bytes1(uint8(char) - 32);
         }
 
-        if (char == 'Y') return 15;
+        if (char == 'Y') return 15; // Código de exceção explícito para o Século 20
 
         bytes15 cycle = STANDARD_CYCLE;
-        // Busca linear no alfabeto (15 elementos) – gas aceitável para validação única.
         for (uint64 i = 0; i < 15; i++) {
             if (cycle[i] == char) return i;
         }
         revert("JEC: Seculo fora do alfabeto homologado (Z-P ou Y)");
     }
 
+    /**
+     * @dev Retorna o caractere do século a partir do índice.
+     */
+    function _getSeculoChar(uint64 idx) private pure returns (string memory) {
+        if (idx == 15) return "Y"; // Exceção Século 20
+        bytes15 cycle = STANDARD_CYCLE;
+        return string(abi.encodePacked(cycle[idx]));
+    }
+
     function _getMesChar(uint64 mes) private pure returns (string memory) {
-        // mes é 1..12, então mes-1 é índice seguro.
         return string(abi.encodePacked(MAP_MES[mes - 1]));
     }
 
     function _getDiaChar(uint64 dia) private pure returns (string memory) {
-        // dia é 1..31, índice seguro.
         return string(abi.encodePacked(MAP_DIA[dia - 1]));
     }
 
     function _getHoraChar(uint64 hora) private pure returns (string memory) {
-        // hora é 0..23, índice seguro.
         return string(abi.encodePacked(MAP_HORA[hora]));
     }
 
     /**
-     * @notice Converte número para string com padding à esquerda com zeros.
-     * @dev Usa aritmética para evitar alocações desnecessárias.
+     * @dev Converte uint64 para string com padding de zeros à esquerda.
      */
     function _padNumber(uint64 num, uint64 length) private pure returns (string memory) {
         string memory str = _uint64ToString(num);
         uint64 strLen = uint64(bytes(str).length);
         if (strLen >= length) return str;
-
+        
         bytes memory padded = new bytes(length);
-        // Preenche com zeros
         for (uint64 i = 0; i < length - strLen; i++) {
             padded[i] = '0';
         }
-        // Copia a string original
         for (uint64 i = 0; i < strLen; i++) {
             padded[length - strLen + i] = bytes(str)[i];
         }
@@ -283,7 +299,7 @@ library JecEnterprise64BitPacker {
     }
 
     /**
-     * @notice Converte uint64 para string (sem padding).
+     * @dev Converte uint64 para string (sem zeros à esquerda).
      */
     function _uint64ToString(uint64 value) private pure returns (string memory) {
         if (value == 0) return "0";
@@ -304,13 +320,12 @@ library JecEnterprise64BitPacker {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // 6. VALIDAÇÃO DE CALENDÁRIO SEMÂNTICO (EVM)
+    // 5. VALIDAÇÃO DE CALENDÁRIO SEMÂNTICO
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Valida se a data é real (considerando anos bissextos).
-     * @dev Usa regras gregorianas: divisível por 4, exceto séculos, mas divisível por 400.
-     *      Cálculo do ano absoluto: se século == 15 (Y), base=1900; senão 2000 + seculoIdx*100.
+     * @dev Valida se a data (mês/dia) existe no calendário (com suporte a anos bissextos).
+     *      Usa aritmética uint256 pura (sem dependência de bibliotecas).
      */
     function _validateDate(uint64 seculoIdx, uint64 ano, uint64 mes, uint64 dia) private pure {
         uint256 centuryBase = seculoIdx == 15 ? 1900 : 2000 + (uint256(seculoIdx) * 100);
