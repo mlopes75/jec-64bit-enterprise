@@ -1,31 +1,162 @@
-// lib/src/jec_enterprise_64bit.dart
+/// Classe de dados estruturada que representa o protocolo desempacotado.
+class JecDecoded {
+  final int headerBits;
+  final String seculo;
+  final int ano;
+  final int mes;
+  final int dia;
+  final int hora;
+  final int minuto;
+  final int segundo;
+  final int microssegundos;
 
+  const JecDecoded({
+    required this.headerBits,
+    required this.seculo,
+    required this.ano,
+    required this.mes,
+    required this.dia,
+    required this.hora,
+    required this.minuto,
+    required this.segundo,
+    required this.microssegundos,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is JecDecoded &&
+      headerBits == other.headerBits &&
+      seculo == other.seculo &&
+      ano == other.ano &&
+      mes == other.mes &&
+      dia == other.dia &&
+      hora == other.hora &&
+      minuto == other.minuto &&
+      segundo == other.segundo &&
+      microssegundos == other.microssegundos;
+
+  @override
+  int get hashCode => Object.hash(
+        headerBits,
+        seculo,
+        ano,
+        mes,
+        dia,
+        hora,
+        minuto,
+        segundo,
+        microssegundos,
+      );
+
+  @override
+  String toString() {
+    return 'JecDecoded(headerBits: $headerBits, seculo: $seculo, '
+        'ano: $ano, mes: $mes, dia: $dia, hora: $hora, '
+        'minuto: $minuto, segundo: $segundo, microssegundos: $microssegundos)';
+  }
+}
+
+/// Implementação robusta, multi-plataforma e altamente documentada do protocolo JecEnterprise 64-Bit.
 class JecEnterprise64Bit {
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CONSTANTES
-  // ═══════════════════════════════════════════════════════════════════════════
+  // --- ALFABETOS E CONVERSÕES (0..14 ciclo padrão, 15 código de exceção 'Y') ---
+  static const List<String> _standardCycle = [
+    'Z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P'
+  ];
 
-  /// Alfabeto Limpo JEC: 24 letras (A-Z, sem 'I' e 'O')
-  static const String alphaTable = "ZABCDEFGHJKLMNPQRSTUVWXY";
+  static const List<String> _hoursMap = [
+    'Z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M',
+    'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y'
+  ];
 
-  /// Mês (1..12):
-  /// A=Jan, B=Fev, C=Mar, D=Abr, E=Mai, F=Jun, G=Jul, H=Ago, J=Set, K=Out, L=Nov, M=Dez
-  static const String mapMes = "ABCDEFGHJKLM";
+  static const List<String> _monthsMap = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M'
+  ];
 
-  /// Dia (1..31):
-  /// A..Z = 1..24, 5..1 = 25..31
-  static const String mapDia = "ABCDEFGHJKLMNPQRSTUVWXYZ5678901";
+  static const List<String> _daysMap = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M',
+    'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    '5', '6', '7', '8', '9', '0', '1'
+  ];
 
-  /// Hora (0..23):
-  /// Z=00, A=01, B=02, ... Y=23
-  static const String mapHora = "ZABCDEFGHJKLMNPQRSTUVWXY";
+  // --- TABELA DE ESPECIFICAÇÃO DO BIT LAYOUT (CONSTANTES DE SHIFT) ---
+  static const int _shiftHeader         = 57;
+  static const int _shiftSeculo         = 53;
+  static const int _shiftAno            = 46;
+  static const int _shiftMes            = 42;
+  static const int _shiftDia            = 37;
+  static const int _shiftHora           = 32;
+  static const int _shiftMinuto         = 26;
+  static const int _shiftSegundo        = 20;
+  static const int _shiftMicrossegundos = 0;
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 1. EMPACOTAMENTO
-  // ═══════════════════════════════════════════════════════════════════════════
+  // --- MÁSCARAS DE HARDWARE ---
+  static final BigInt _mask7Bits  = BigInt.from(0x7F);
+  static final BigInt _mask6Bits  = BigInt.from(0x3F);
+  static final BigInt _mask5Bits  = BigInt.from(0x1F);
+  static final BigInt _mask4Bits  = BigInt.from(0x0F);
+  static final BigInt _mask20Bits = BigInt.from(0xFFFFF);
 
-  /// Empacota todos os campos em uma estrutura lógica de 64 bits.
-  static int pack({
+  // --- FRONTEIRAS MATEMÁTICAS ---
+  static final BigInt _twoPow64  = BigInt.one << 64;
+  static final BigInt _maxUint64 = _twoPow64 - BigInt.one;
+
+  // --- VALIDAÇÕES DE SEGURANÇA ---
+  static void _checkRange(String name, int value, int min, int max) {
+    if (value < min || value > max) {
+      throw ArgumentError('$name inválido: $value. Esperado entre $min e $max.');
+    }
+  }
+
+  static void _validateUint64(BigInt value) {
+    if (value < BigInt.zero || value > _maxUint64) {
+      throw ArgumentError('Valor fora do intervalo uint64: $value');
+    }
+  }
+
+  static void _validateDate(String seculoLetter, int ano, int mes, int dia) {
+    final cleanSeculo = seculoLetter.toUpperCase();
+    final int centuryBase;
+
+    if (cleanSeculo == 'Y') {
+      centuryBase = 1900;
+    } else {
+      final index = _standardCycle.indexOf(cleanSeculo);
+      if (index == -1) {
+        throw ArgumentError('Século inválido para validação de data: $seculoLetter');
+      }
+      centuryBase = 2000 + (index * 100);
+    }
+
+    final int fullYear = centuryBase + ano;
+    final date = DateTime(fullYear, mes, dia);
+
+    if (date.year != fullYear || date.month != mes || date.day != dia) {
+      throw ArgumentError('Data inválida: $dia/$mes/$fullYear (Inexistente no calendário)');
+    }
+  }
+
+  // --- INTERRUPTORES DE FLUXO DO SÉCULO ---
+  static int _packCentury(String seculoLetter) {
+    final cleanLetter = seculoLetter.toUpperCase();
+    if (cleanLetter == 'Y') return 0b1111;
+
+    final index = _standardCycle.indexOf(cleanLetter);
+    if (index == -1) {
+      throw ArgumentError('Século inválido para o ciclo padrão: $seculoLetter');
+    }
+    return index;
+  }
+
+  static String _unpackCentury(int centuryBits) {
+    if (centuryBits == 0b1111) return 'Y';
+    if (centuryBits < 0 || centuryBits >= _standardCycle.length) {
+      throw ArgumentError('Bits de século inválidos ou corrompidos: $centuryBits');
+    }
+    return _standardCycle[centuryBits];
+  }
+
+  // --- FLUXO DE CODIFICAÇÃO (PACKING) ---
+  static BigInt pack({
     required int headerBits,
     required String seculo,
     required int ano,
@@ -36,214 +167,87 @@ class JecEnterprise64Bit {
     required int segundo,
     required int microssegundos,
   }) {
-    // Validação: Header (7 bits - 0 a 127)
-    if (headerBits < 0 || headerBits > 127) {
-      throw ArgumentError.value(
-        headerBits,
-        'headerBits',
-        'Deve estar entre 0 e 127 (7 bits).',
-      );
-    }
+    _checkRange('headerBits', headerBits, 0, 127);
+    _checkRange('ano', ano, 0, 99);
+    _checkRange('mes', mes, 1, 12);
+    _checkRange('dia', dia, 1, 31);
+    _checkRange('hora', hora, 0, 23);
+    _checkRange('minuto', minuto, 0, 59);
+    _checkRange('segundo', segundo, 0, 59);
+    _checkRange('microssegundos', microssegundos, 0, 999999);
 
-    // Validação: Século
-    if (seculo.length != 1) {
-      throw ArgumentError.value(
-        seculo,
-        'seculo',
-        'Deve conter exatamente um caractere.',
-      );
-    }
+    _validateDate(seculo, ano, mes, dia);
 
-    final String secUpper = seculo.toUpperCase();
-    final int idxSeculo = alphaTable.indexOf(secUpper);
+    final int seculoPacked = _packCentury(seculo);
+    BigInt result = BigInt.zero;
 
-    if (idxSeculo == -1) {
-      throw ArgumentError.value(
-        seculo,
-        'seculo',
-        'Código inválido. Use uma letra A-Z, exceto I e O.',
-      );
-    }
-
-    if (idxSeculo > 14) {
-      throw ArgumentError.value(
-        seculo,
-        'seculo',
-        'Século inválido. Use A-Q (0-14) para o ciclo de 1500 anos.',
-      );
-    }
-
-    // Validação: Ano
-    if (ano < 0 || ano > 99) {
-      throw ArgumentError.value(ano, 'ano', 'Deve estar entre 0 e 99.');
-    }
-
-    // Validação: Mês
-    if (mes < 1 || mes > 12) {
-      throw ArgumentError.value(mes, 'mes', 'Deve estar entre 1 e 12.');
-    }
-
-    // Validação: Dia
-    if (dia < 1 || dia > 31) {
-      throw ArgumentError.value(dia, 'dia', 'Deve estar entre 1 e 31.');
-    }
-
-    // Validação: Hora
-    if (hora < 0 || hora > 23) {
-      throw ArgumentError.value(hora, 'hora', 'Deve estar entre 0 e 23.');
-    }
-
-    // Validação: Minuto
-    if (minuto < 0 || minuto > 59) {
-      throw ArgumentError.value(minuto, 'minuto', 'Deve estar entre 0 e 59.');
-    }
-
-    // Validação: Segundo
-    if (segundo < 0 || segundo > 59) {
-      throw ArgumentError.value(segundo, 'segundo', 'Deve estar entre 0 e 59.');
-    }
-
-    // Validação: Microssegundos
-    if (microssegundos < 0 || microssegundos > 999999) {
-      throw ArgumentError.value(
-        microssegundos,
-        'microssegundos',
-        'Deve estar entre 0 e 999999.',
-      );
-    }
-
-    // Validação de data real (anos bissextos e limites do mês)
-    final int validationYear = 2000 + ano;
-    final DateTime validationDate = DateTime(validationYear, mes, dia);
-
-    if (validationDate.year != validationYear ||
-        validationDate.month != mes ||
-        validationDate.day != dia) {
-      throw ArgumentError('Data inválida: $dia/$mes/$ano.');
-    }
-
-    int result = 0;
-
-    // Empacotamento com os shifts corretos
-    // Header: bits 63-57 (7 bits)
-    result |= (headerBits & 0x7F) << 57;
-
-    // Século: bits 56-53 (4 bits)
-    result |= (idxSeculo & 0x0F) << 53;
-
-    // Ano: bits 52-46 (7 bits)
-    result |= (ano & 0x7F) << 46;
-
-    // Mês: bits 45-42 (4 bits)
-    result |= (mes & 0x0F) << 42;
-
-    // Dia: bits 41-37 (5 bits)
-    result |= (dia & 0x1F) << 37;
-
-    // Hora: bits 36-32 (5 bits)
-    result |= (hora & 0x1F) << 32;
-
-    // Minuto: bits 31-26 (6 bits)
-    result |= (minuto & 0x3F) << 26;
-
-    // Segundo: bits 25-20 (6 bits)
-    result |= (segundo & 0x3F) << 20;
-
-    // Microssegundos: bits 19-0 (20 bits)
-    result |= (microssegundos & 0xFFFFF);
+    result |= (BigInt.from(headerBits) & _mask7Bits) << _shiftHeader;
+    result |= (BigInt.from(seculoPacked) & _mask4Bits) << _shiftSeculo;
+    result |= (BigInt.from(ano) & _mask7Bits) << _shiftAno;
+    result |= (BigInt.from(mes) & _mask4Bits) << _shiftMes;
+    result |= (BigInt.from(dia) & _mask5Bits) << _shiftDia;
+    result |= (BigInt.from(hora) & _mask5Bits) << _shiftHora;
+    result |= (BigInt.from(minuto) & _mask6Bits) << _shiftMinuto;
+    result |= (BigInt.from(segundo) & _mask6Bits) << _shiftSegundo;
+    result |= (BigInt.from(microssegundos) & _mask20Bits) << _shiftMicrossegundos;
 
     return result;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 2. DESEMPACOTAMENTO PARA STRING HUMANA
-  // ═══════════════════════════════════════════════════════════════════════════
+  // --- FLUXO DE DECODIFICAÇÃO (UNPACKING) ---
+  static JecDecoded unpack(BigInt packed) {
+    _validateUint64(packed);
 
-  static String unpackToHumanString(
-    int packedValue, {
-    String alias = "A",
-  }) {
-    final int idxSeculo = (packedValue >> 53) & 0x0F;
-    final int ano = (packedValue >> 46) & 0x7F;
-    final int mes = (packedValue >> 42) & 0x0F;
-    final int dia = (packedValue >> 37) & 0x1F;
-    final int hora = (packedValue >> 32) & 0x1F;
-    final int minuto = (packedValue >> 26) & 0x3F;
-    final int segundo = (packedValue >> 20) & 0x3F;
-    final int microssegundos = packedValue & 0xFFFFF;
+    int headerBits = ((packed >> _shiftHeader) & _mask7Bits).toInt();
+    int seculoBits = ((packed >> _shiftSeculo) & _mask4Bits).toInt();
+    int ano        = ((packed >> _shiftAno) & _mask7Bits).toInt();
+    int mes        = ((packed >> _shiftMes) & _mask4Bits).toInt();
+    int dia        = ((packed >> _shiftDia) & _mask5Bits).toInt();
+    int hora       = ((packed >> _shiftHora) & _mask5Bits).toInt();
+    int minuto     = ((packed >> _shiftMinuto) & _mask6Bits).toInt();
+    int segundo    = ((packed >> _shiftSegundo) & _mask6Bits).toInt();
+    int microssegundos = ((packed >> _shiftMicrossegundos) & _mask20Bits).toInt();
 
-    final String charSeculo =
-        (idxSeculo >= 0 && idxSeculo < alphaTable.length)
-            ? alphaTable[idxSeculo]
-            : '?';
+    _checkRange('ano', ano, 0, 99);
+    _checkRange('mes', mes, 1, 12);
+    _checkRange('dia', dia, 1, 31);
+    _checkRange('hora', hora, 0, 23);
+    _checkRange('minuto', minuto, 0, 59);
+    _checkRange('segundo', segundo, 0, 59);
+    _checkRange('microssegundos', microssegundos, 0, 999999);
 
-    final String strAno = ano.toString().padLeft(2, '0');
+    final String seculo = _unpackCentury(seculoBits);
+    _validateDate(seculo, ano, mes, dia);
 
-    final String strMes =
-        (mes >= 1 && mes <= 12) ? mapMes[mes - 1] : '?';
-
-    final String strDia =
-        (dia >= 1 && dia <= 31) ? mapDia[dia - 1] : '?';
-
-    final String strHora =
-        (hora >= 0 && hora < mapHora.length) ? mapHora[hora] : '?';
-
-    final String strMin =
-        (minuto >= 0 && minuto <= 59) ? minuto.toString().padLeft(2, '0') : '??';
-
-    final String strSeg =
-        (segundo >= 0 && segundo <= 59) ? segundo.toString().padLeft(2, '0') : '??';
-
-    final String strMcs =
-        (microssegundos >= 0 && microssegundos <= 999999)
-            ? microssegundos.toString().padLeft(6, '0')
-            : '??????';
-
-    final String cleanAlias = alias.trim().isEmpty ? "A" : alias.toUpperCase();
-
-    return "$cleanAlias."
-        "$charSeculo"
-        "$strAno"
-        "$strMes"
-        "$strDia"
-        "$strHora"
-        "$strMin"
-        "$strSeg"
-        ".$strMcs";
+    return JecDecoded(
+      headerBits: headerBits,
+      seculo: seculo,
+      ano: ano,
+      mes: mes,
+      dia: dia,
+      hora: hora,
+      minuto: minuto,
+      segundo: segundo,
+      microssegundos: microssegundos,
+    );
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 3. DESEMPACOTAMENTO PARA MAP
-  // ═══════════════════════════════════════════════════════════════════════════
+  // --- FLUXO DE APRESENTAÇÃO ---
+  static String toHumanString(JecDecoded decoded, {required String alias}) {
+    String seculoChar = decoded.seculo;
+    String anoStr     = decoded.ano.toString().padLeft(2, '0');
+    String mesChar    = _monthsMap[decoded.mes - 1];
+    String diaChar    = _daysMap[decoded.dia - 1];
+    String horaChar   = _hoursMap[decoded.hora];
+    String minStr     = decoded.minuto.toString().padLeft(2, '0');
+    String segStr     = decoded.segundo.toString().padLeft(2, '0');
+    String microStr   = decoded.microssegundos.toString().padLeft(6, '0');
 
-  static Map<String, dynamic> unpack(int packedValue) {
-    final int idxSeculo = (packedValue >> 53) & 0x0F;
-
-    final String seculo =
-        (idxSeculo >= 0 && idxSeculo < alphaTable.length)
-            ? alphaTable[idxSeculo]
-            : '?';
-
-    return {
-      'headerBits': (packedValue >> 57) & 0x7F,
-      'seculoIdx': idxSeculo,
-      'seculo': seculo,
-      'ano': (packedValue >> 46) & 0x7F,
-      'mes': (packedValue >> 42) & 0x0F,
-      'dia': (packedValue >> 37) & 0x1F,
-      'hora': (packedValue >> 32) & 0x1F,
-      'minuto': (packedValue >> 26) & 0x3F,
-      'segundo': (packedValue >> 20) & 0x3F,
-      'microssegundos': packedValue & 0xFFFFF,
-    };
+    return "$alias.$seculoChar$anoStr$mesChar$diaChar$horaChar$minStr$segStr.$microStr";
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // 4. EXTRAÇÃO DO HEADER
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  /// Extrai os 7 bits superiores do identificador (User Space).
-  static int extractHeaderBits(int packedValue) {
-    return (packedValue >> 57) & 0x7F;
+  static String unpackToHumanString(BigInt packed, {required String alias}) {
+    final decoded = unpack(packed);
+    return toHumanString(decoded, alias: alias);
   }
 }
