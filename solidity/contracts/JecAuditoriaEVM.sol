@@ -79,7 +79,7 @@ library JecEnterprise64BitPacker {
 
     /// @notice Ciclo padrão de 15 séculos (exclui 'Y' pois este virou código de exceção 15).
     ///         Índice 0 = 'Z' (2000–2099), índice 14 = 'P' (3400–3499).
-    bytes15 private constant STANDARD_CYCLE = "ZABCDEFGHJKLMNP";
+    bytes15 internal constant STANDARD_CYCLE = "ZABCDEFGHJKLMNP";
 
     /// @notice Mapeamento de meses (índice 0 = Janeiro = 'A', ..., índice 11 = Dezembro = 'M').
     bytes12 private constant MAP_MES = "ABCDEFGHJKLM";
