@@ -1,4 +1,10 @@
 /// Classe de dados estruturada que representa o protocolo desempacotado.
+///
+/// **Semântica do campo [hora]:**
+/// - Quando obtido via [JecEnterprise64Bit.unpack], [hora] representa **UTC**.
+/// - Quando obtido via [JecEnterprise64Bit.toLocal], [hora] representa **hora local**.
+///
+/// O nome neutro evita mentir sobre a semântica do valor.
 class JecDecoded {
   final int headerBits;
   final String seculo;
@@ -56,7 +62,12 @@ class JecDecoded {
   }
 }
 
-/// Implementação robusta, multi-plataforma e altamente documentada do protocolo JecEnterprise 64-Bit.
+/// Implementação robusta, multi-plataforma e altamente documentada do
+/// protocolo JecEnterprise 64-Bit.
+///
+/// **Semântica UTC:** Todo valor JEC armazena **UTC 0**. A hora local é
+/// derivada via [toLocal] / [toLocalString], aplicando o offset do fuso.
+/// Isso garante que um instante físico corresponde a exatamente uma string JEC.
 class JecEnterprise64Bit {
   // --- ALFABETOS E CONVERSÕES (0..14 ciclo padrão, 15 código de exceção 'Y') ---
   static const List<String> _standardCycle = [
@@ -77,6 +88,24 @@ class JecEnterprise64Bit {
     'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
     '5', '6', '7', '8', '9', '0', '1'
   ];
+
+  // --- CONVERSÃO SÉCULO ↔ ANO ---
+  static int _centuryBase(String letra) {
+    final clean = letra.toUpperCase();
+    if (clean == 'Y') return 1900;
+    final index = _standardCycle.indexOf(clean);
+    if (index == -1) throw ArgumentError('Século inválido: $letra');
+    return 2000 + (index * 100);
+  }
+
+  static String _centuryLetter(int ano) {
+    if (ano >= 1900 && ano <= 1999) return 'Y';
+    if (ano >= 2000 && ano <= 3499) {
+      final index = (ano - 2000) ~/ 100;
+      return _standardCycle[index];
+    }
+    throw ArgumentError('Ano fora do ciclo JEC: $ano');
+  }
 
   // --- TABELA DE ESPECIFICAÇÃO DO BIT LAYOUT (CONSTANTES DE SHIFT) ---
   static const int _shiftHeader         = 57;
@@ -122,16 +151,18 @@ class JecEnterprise64Bit {
     } else {
       final index = _standardCycle.indexOf(cleanSeculo);
       if (index == -1) {
-        throw ArgumentError('Século inválido para validação de data: $seculoLetter');
+        throw ArgumentError(
+            'Século inválido para validação de data: $seculoLetter');
       }
       centuryBase = 2000 + (index * 100);
     }
 
     final int fullYear = centuryBase + ano;
-    final date = DateTime(fullYear, mes, dia);
+    final date = DateTime.utc(fullYear, mes, dia);
 
     if (date.year != fullYear || date.month != mes || date.day != dia) {
-      throw ArgumentError('Data inválida: $dia/$mes/$fullYear (Inexistente no calendário)');
+      throw ArgumentError(
+          'Data inválida: $dia/$mes/$fullYear (Inexistente no calendário)');
     }
   }
 
@@ -156,13 +187,17 @@ class JecEnterprise64Bit {
   }
 
   // --- FLUXO DE CODIFICAÇÃO (PACKING) ---
+  /// Empacota um instante **UTC** num `BigInt` de 64 bits.
+  ///
+  /// O campo [horaUTC] deve estar entre 0 e 23. A hora local **nunca** é
+  /// armazenada — ela é derivada na leitura via [toLocal] / [toLocalString].
   static BigInt pack({
     required int headerBits,
     required String seculo,
     required int ano,
     required int mes,
     required int dia,
-    required int hora,
+    required int horaUTC,
     required int minuto,
     required int segundo,
     required int microssegundos,
@@ -171,7 +206,7 @@ class JecEnterprise64Bit {
     _checkRange('ano', ano, 0, 99);
     _checkRange('mes', mes, 1, 12);
     _checkRange('dia', dia, 1, 31);
-    _checkRange('hora', hora, 0, 23);
+    _checkRange('horaUTC', horaUTC, 0, 23);
     _checkRange('minuto', minuto, 0, 59);
     _checkRange('segundo', segundo, 0, 59);
     _checkRange('microssegundos', microssegundos, 0, 999999);
@@ -186,7 +221,7 @@ class JecEnterprise64Bit {
     result |= (BigInt.from(ano) & _mask7Bits) << _shiftAno;
     result |= (BigInt.from(mes) & _mask4Bits) << _shiftMes;
     result |= (BigInt.from(dia) & _mask5Bits) << _shiftDia;
-    result |= (BigInt.from(hora) & _mask5Bits) << _shiftHora;
+    result |= (BigInt.from(horaUTC) & _mask5Bits) << _shiftHora;
     result |= (BigInt.from(minuto) & _mask6Bits) << _shiftMinuto;
     result |= (BigInt.from(segundo) & _mask6Bits) << _shiftSegundo;
     result |= (BigInt.from(microssegundos) & _mask20Bits) << _shiftMicrossegundos;
@@ -195,6 +230,9 @@ class JecEnterprise64Bit {
   }
 
   // --- FLUXO DE DECODIFICAÇÃO (UNPACKING) ---
+  /// Desempacota um `BigInt` de 64 bits num [JecDecoded].
+  ///
+  /// O campo [JecDecoded.hora] do resultado representa **UTC**.
   static JecDecoded unpack(BigInt packed) {
     _validateUint64(packed);
 
@@ -203,7 +241,7 @@ class JecEnterprise64Bit {
     int ano        = ((packed >> _shiftAno) & _mask7Bits).toInt();
     int mes        = ((packed >> _shiftMes) & _mask4Bits).toInt();
     int dia        = ((packed >> _shiftDia) & _mask5Bits).toInt();
-    int hora       = ((packed >> _shiftHora) & _mask5Bits).toInt();
+    int horaUTC    = ((packed >> _shiftHora) & _mask5Bits).toInt();
     int minuto     = ((packed >> _shiftMinuto) & _mask6Bits).toInt();
     int segundo    = ((packed >> _shiftSegundo) & _mask6Bits).toInt();
     int microssegundos = ((packed >> _shiftMicrossegundos) & _mask20Bits).toInt();
@@ -211,7 +249,7 @@ class JecEnterprise64Bit {
     _checkRange('ano', ano, 0, 99);
     _checkRange('mes', mes, 1, 12);
     _checkRange('dia', dia, 1, 31);
-    _checkRange('hora', hora, 0, 23);
+    _checkRange('horaUTC', horaUTC, 0, 23);
     _checkRange('minuto', minuto, 0, 59);
     _checkRange('segundo', segundo, 0, 59);
     _checkRange('microssegundos', microssegundos, 0, 999999);
@@ -225,7 +263,7 @@ class JecEnterprise64Bit {
       ano: ano,
       mes: mes,
       dia: dia,
-      hora: hora,
+      hora: horaUTC,
       minuto: minuto,
       segundo: segundo,
       microssegundos: microssegundos,
@@ -233,6 +271,10 @@ class JecEnterprise64Bit {
   }
 
   // --- FLUXO DE APRESENTAÇÃO ---
+  /// Converte um [JecDecoded] em string legível.
+  ///
+  /// O alias é metadado externo (nome do serviço). O valor numérico
+  /// correspondente está em [JecDecoded.headerBits].
   static String toHumanString(JecDecoded decoded, {required String alias}) {
     String seculoChar = decoded.seculo;
     String anoStr     = decoded.ano.toString().padLeft(2, '0');
@@ -249,5 +291,49 @@ class JecEnterprise64Bit {
   static String unpackToHumanString(BigInt packed, {required String alias}) {
     final decoded = unpack(packed);
     return toHumanString(decoded, alias: alias);
+  }
+
+  // --- FLUXO DE DERIVAÇÃO LOCAL ---
+  /// Deriva a hora local a partir de um [JecDecoded] em UTC.
+  ///
+  /// O [offset] é o fuso horário em horas (−12 a +14). Valores como
+  /// `+1` (Lisboa), `-3` (Brasil), `+9` (Tóquio) são suportados.
+  ///
+  /// O [JecDecoded.hora] do resultado representa **hora local**.
+  /// O dia, mês e ano podem sofrer rollover se o offset cruzar a meia-noite.
+  static JecDecoded toLocal(JecDecoded decoded, {required int offset}) {
+    _checkRange('offset', offset, -12, 14);
+
+    final centuryBase = _centuryBase(decoded.seculo);
+    final fullYear = centuryBase + decoded.ano;
+
+    final utcDate = DateTime.utc(
+      fullYear, decoded.mes, decoded.dia,
+      decoded.hora, decoded.minuto, decoded.segundo,
+      decoded.microssegundos ~/ 1000,
+    );
+
+    final localDate = utcDate.add(Duration(hours: offset));
+
+    return JecDecoded(
+      headerBits: decoded.headerBits,
+      seculo: _centuryLetter(localDate.year),
+      ano: localDate.year % 100,
+      mes: localDate.month,
+      dia: localDate.day,
+      hora: localDate.hour,
+      minuto: localDate.minute,
+      segundo: localDate.second,
+      microssegundos: decoded.microssegundos,
+    );
+  }
+
+  /// Atalho: retorna a string legível da hora local.
+  static String toLocalString(
+    JecDecoded decoded, {
+    required int offset,
+    required String alias,
+  }) {
+    return toHumanString(toLocal(decoded, offset: offset), alias: alias);
   }
 }
