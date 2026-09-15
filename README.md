@@ -161,6 +161,8 @@ Y = 23:00 (23h - última hora do dia)
 | **Segundo** | 6 bits | 00-59 | Valor numérico puro (2 dígitos) | 14 |
 | **Microssegundo** | 20 bits | 000000-999999 | Valor numérico puro (6 dígitos) | 421983 |
 
+> ## 📝 Nota sobre stringLocal(offset):
+> A derivação de hora local não é uma simples troca de caractere. Quando o offset cruza a meia-noite (para frente ou para trás), o dia, o mês e potencialmente o ano/século mudam também. A função deve recalcular a data completa no fuso desejado, respeitando o calendário gregoriano (dias por mês, anos bissextos).
 
 
 🎯 Exemplo de Uso Atualizado (Camada Dart)
@@ -181,7 +183,11 @@ void main() {
 
   final jec = JecEnterprise64Bit.unpack(packed);
   print(jec.stringUTC);              // LOG.Z26J0Y5314.421983
+                                    // UTC: 30/09/2026 às 23:53:14
+  
   print(jec.stringLocal(offset: +1)); // LOG.Z26KAZ5314.421983 (Lisboa)
+                                    // Local: 01/10/2026 às 00:53:14
+                                    // (23h + 1h = 24h → vira dia/mês)
 }
 ```
 🎯 2. Camada Solidity (Ethereum / EVM)
@@ -195,8 +201,12 @@ Análise de campo conduzida sobre a implementação Dart em produção(aplicaç�
 A ordenação binária do JEC é gratuita — mas apenas entre valores unsigned.Existe uma divergência de plataformas que esta especificação documentaexplicitamente, para que seja descoberta aqui e não em produção:
 
 O User Space ocupa os bits 57–63. O bit 63 é o bit de sinal do int do Dart(signed 64-bit, complemento de dois) — mas é apenas o bit mais alto do uint64da EVM (unsigned). O mesmo bit pattern tem dois significados diferentes:
-
-// Em Dart, qualquer JEC com header >= 64 é NEGATIVO:final a = 63 << 57;   // positivofinal b = 127 << 57;  // negativo em Dart — mas é o MAIOR valor uint64 na EVMprint(b < a);         // true em Dart — ordem INVERTIDA face à EVM
+```
+// Em Dart, qualquer JEC com header >= 64 é NEGATIVO:
+final a = 63 << 57;   // positivo
+final b = 127 << 57;  // negativo em Dart — mas é o MAIOR valor uint64 na EVM
+print(b < a);         // true em Dart — ordem INVERTIDA face à EVM
+```
 Metade do espaço do Header (64–127) ordena de forma diferente entre Dart e EVM.
 Quem ordenar JECs com compareTo nativo do Dart — ou num BIGINT de banco de
 dados — herda este desvio silenciosamente. Não há exceção, há apenas resultados
