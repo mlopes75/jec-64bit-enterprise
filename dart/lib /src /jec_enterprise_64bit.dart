@@ -269,7 +269,14 @@ class JecEnterprise64Bit {
       microssegundos: microssegundos,
     );
   }
-
+  
+  /// Extrai os 7 bits superiores do identificador (User Space).
+  /// Útil para testes e para leitura direta do ID de serviço sem
+  /// desempacotar o JEC inteiro.
+  static int extractHeaderBits(BigInt packed) {
+    return ((packed >> _shiftHeader) & _mask7Bits).toInt();
+  }
+  
   // --- FLUXO DE APRESENTAÇÃO ---
   /// Converte um [JecDecoded] em string legível.
   ///
